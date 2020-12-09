@@ -34,7 +34,6 @@ class Webserver {
     _onWsConnect(ws) {
         let rAddr = ws._socket.remoteAddress;
         let rPort = ws._socket.remotePort;
-        console.log(chalk.bgMagenta.white.bold(" WS ")+" Client "+rAddr+":"+rPort+" connected");
         ws.on("message", this._onWsMessage.bind(this, ws));
     }
         
