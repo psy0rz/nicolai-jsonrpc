@@ -4,7 +4,7 @@
 
 MIT License
 
-Copyright (c) 2020 Renze Nicolai
+Copyright (c) 2021 Renze Nicolai
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -120,11 +120,14 @@ class Rpc {
 		this._alwaysAllow.push(method);
 	}
 	
-	_checkParameters(parameters, constraints) {
+	_checkParameters(parameters, constraints, path="/") {
 		let accepted = false;
+		let reason = "Unspecified ("+path+")";
 		// 1) When no parameters are supplied
 		if ((parameters === null) && ((constraints.type === "none") || (constraints.type === "null"))) {
 			accepted = true;
+		} else if (parameters === null) {
+			reason = "Found NULL, expected '" + constraints.type + "' ("+path+")";
 		}
 		// 2) When the function accepts any argument
 		if (constraints.type === "any") {
@@ -133,22 +136,41 @@ class Rpc {
 		// 3) When the function accepts a string argument
 		else if ((typeof parameters === "string") && (constraints.type === "string")) {
 			accepted = true;
+		} else if (typeof parameters === "string") {
+			reason = "Found 'string', expected '" + constraints.type + "' ("+path+")";
 		}
 		// 4) When the function accepts a number argument
 		else if ((typeof parameters === "number") && (constraints.type === "number")) {
 			accepted = true;
+		} else if (typeof parameters === "number") {
+			reason = "Found 'number', expected '" + constraints.type + "' ("+path+")";
 		}
 		// 5) When the function accepts a boolean argument
 		else if ((typeof parameters === "boolean") && (constraints.type === "boolean")) {
 			accepted = true;
+		} else if (typeof parameters === "boolean") {
+			reason = "Found 'boolean', expected '" + constraints.type + "' ("+path+")";
 		}
 		// 6) When the function accepts an array
 		else if ((typeof parameters === "object") && (Array.isArray(parameters)) && (constraints.type === "array")) {
-			if (typeof constraints.contains === "string") {
+			if ((typeof constraints.length === "number") && (parameters.length !== constraints.length)) {
+				// Length is defined and does not match
+				reason = "Length mismatch ("+path+")";
+				accepted = false;
+			} else if ((typeof constraints.minlength === "number") && (parameters.length < constraints.minlength)) {
+				// Minimum length is defined and does not match
+				reason = "Length less than minimum ("+path+")";
+				accepted = false;
+			} else if ((typeof constraints.maxlength === "number") && (parameters.length > constraints.maxlength)) {
+				// Maximum length is defined and does not match
+				reason = "Length larger than maximum ("+path+")";
+				accepted = false;
+			} else if (typeof constraints.contains === "string") {
 				accepted = true;
 				if (constraints.contains !== 'any') {
 					for (var i = 0; i < parameters.length; i++) {
 						if (typeof parameters[i] !== constraints.contains) {
+							reason = "Type mismatch ("+path+")";
 							accepted = false;
 							break;
 						}
@@ -157,8 +179,10 @@ class Rpc {
 			} else if (typeof constraints.contains === "object") {
 				accepted = true;
 				for (var i = 0; i < parameters.length; i++) {
-					if (!this._checkParameters(parameters[i], constraints.contains)) {
+					const [result, subReason] = this._checkParameters(parameters[i], constraints.contains, path + "[" + i + "]/");
+					if (!result) {
 						accepted = false;
+						reason = subReason;
 						break;
 					}
 				}
@@ -166,12 +190,20 @@ class Rpc {
 				// No valid constraints found for the contents of the array
 				accepted = true;
 			}
+		} else if ((typeof parameters === "object") && (Array.isArray(parameters)) && (constraints.type !== "array")) {
+			reason = "Found 'array', expected '" + constraints.type + "' ("+path+")";
 		}
 		// 7) When the function accepts an object
 		else if ((typeof parameters === "object") && (constraints.type === "object")) {
+			if ((typeof constraints.contains === "object") && (typeof constraints.required === "undefined")) {
+				constraints.required = constraints.contains;
+			}
 			if (parameters === null) {
 				// When the object is null
 				accepted = (typeof constraints.allowNull === 'boolean') && (constraints.allowNull === true);
+				if (!accepted) {
+					reason = "Expected element, found NULL ("+path+")";
+				}
 			} else if ((typeof constraints.required === "undefined") && (typeof constraints.optional === "undefined")) {
 				// When the object has no constraints
 				accepted = true;
@@ -182,14 +214,17 @@ class Rpc {
 					for (let item in constraints.required) {
 						if (typeof parameters[item] === "undefined") {
 							// And a required parameter is missing
+							reason = "Required parameter is missing ("+path+")";
 							accepted = false;
 							break;
 						}
 						if (typeof constraints.required[item].type !== "undefined") {
 							// If constraints are set for the content of the required parameter
-							if (!this._checkParameters(parameters[item], constraints.required[item])) {
+							const [result, subReason] = this._checkParameters(parameters[item], constraints.required[item], path + item + "/");
+							if (!result) {
 								// The constraints of the parameter were not met
 								accepted = false;
+								reason = subReason;
 								break;
 							}
 						}
@@ -202,35 +237,41 @@ class Rpc {
 						// The parameter is a required parameter
 						continue;
 					} else if ((typeof constraints.optional !== "undefined") && (item in constraints.optional)) {
-						// The parameter is an optinoal parameter
+						// The parameter is an optional parameter
 						if (typeof constraints.optional[item].type !== "undefined") {
 							// If constraints are set for the contents of the optional parameter
-							if (!this._checkParameters(parameters[item], constraints.optional[item])) {
+							const [result, subReason] = this._checkParameters(parameters[item], constraints.optional[item], path + item + "/");
+							if (!result) {
 								// The constraints of the parameter were not met
 								accepted = false;
+								reason = subReason;
 								break;
 							}
 						}
 					} else {
 						// The parameter is neither a required or an optional parameter
+						reason = "Found stray parameter '"+item+"' ("+path+")";
 						accepted = false;
 						break;
 					}
 				}
 			}
+		} else if ((typeof parameters === "object") && (constraints.type !== "object")) {
+			reason = "Found 'object', expected '" + constraints.type + "' ("+path+")";
 		}
 		// 8) When the function accepts multiple types
 		else if (Array.isArray(constraints.type)) {
 			let listOfTypes = constraints.type;
 			for (let i = 0; i < listOfTypes.length; i++) {
 				constraints.type = listOfTypes[i];
-				if (this._checkParameters(parameters, constraints)) {
+				const [result, subReason] = this._checkParameters(parameters, constraints, "[" + i + "]/");
+				if (result) {
 					accepted = true;
 					break;
 				}
 			}
 		}
-		return accepted;
+		return [accepted, reason];
 	}
 	
 	
@@ -298,15 +339,18 @@ class Rpc {
 		
 		if (typeof this._methods[request.method].parameters !== "undefined") {			
 			let accepted = false;
+			let reason = "";
 			for (var i = 0; i < this._methods[request.method].parameters.length; i++) {
 				let constraint = this._methods[request.method].parameters[i];
-				if (this._checkParameters(request.params, constraint)) {
+				const [result, subReason] = this._checkParameters(request.params, constraint);
+				reason = subReason;
+				if (result) {
 					accepted = true;
 					break;
 				}
 			}
 			if (!accepted) {
-				response.error = this.errors.parameters;
+				response.error = Object.assign(this.errors.parameters, {"reason": reason});
 				throw response;
 			}
 		}
@@ -315,10 +359,11 @@ class Rpc {
 			var result = await this._methods[request.method].callback(session, request.params);
 			response.result = result;
 		} catch (error) {
+			console.log("RPC method", request.method, "with parameters", request.parameters, "failed with error", error);
 			if (typeof error==="string") {
 				response.error = Object.assign({ message: error }, this.errors.user);
 			} else {
-				response.error = Object.assign({ raw: error }, this.errors.internal);
+				response.error = Object.assign({ raw: String(error) }, this.errors.internal);
 			}
 			throw response;
 		}
