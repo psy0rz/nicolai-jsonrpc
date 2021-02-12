@@ -1,13 +1,10 @@
 "use strict";
 
 const Webserver = require('./webserver.js');
-const Rpc = require('simple-json-rpc');
+const { Rpc, SessionManager } = require('simple-json-rpc');
 
-var rpc = new Rpc({
-    strict: true,
-    auth: null,
-    identity: "Example"
-});
+var sessionManager = new SessionManager();
+var rpc = new Rpc("Example", sessionManager);
 
 var webserver = new Webserver({
     port: 8080,
