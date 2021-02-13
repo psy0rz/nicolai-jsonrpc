@@ -129,7 +129,7 @@ class ApiClient {
             this.request('user/authenticate', {username: username, password: password}, (result, error) => {
                 this._ping();
                 if (typeof callback === "function") {
-                    callback(error, result);
+                    callback(result, error);
                 }
             });
         }

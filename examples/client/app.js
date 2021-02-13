@@ -76,14 +76,15 @@ class App {
             let username = document.getElementById("username").value;
             let password = document.getElementById("password").value;
             this.apiClient.login(username, password, (result, error) => {
-            if (error === null) {
-                console.log("Login succesfull");
-                document.getElementById("loginButton").disabled = true;
-            } else {
-                console.log("Login error:", error);
-                document.getElementById("loginButton").disabled = false;
-                alert("Login error: " + error.message);
-            }
+                if (error === null) {
+                    console.log("Login succesfull");
+                    document.getElementById("loginButton").disabled = true;
+                } else {
+                    console.log("Login error:", error);
+                    document.getElementById("loginButton").disabled = false;
+                    alert("Login error: " + error.message);
+                }
+                console.log(result, error);
             });
         } catch (error) {
             console.log("Login request failed:", error);
