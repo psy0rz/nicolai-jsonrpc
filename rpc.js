@@ -281,19 +281,25 @@ class Rpc {
         
         // 2) Check if the client is authorized to execute the method
         let session = null;
-        if ((this._sessionManager !== null) && (this._methods[method].public === false)) {
-            session = this._sessionManager.getSession(token);
-            if (session === null) {
-                throw this._errors.invalidToken;
+        if (this._sessionManager !== null) {
+            if (token !== null) {
+                session = this._sessionManager.getSession(token);
+                if (session === null) {
+                    throw this._errors.invalidToken;
+                }
             }
+            if (session !== null) {
             if (typeof session.use === "function") {
-                session.use();
+                    session.use();
+                }
+                if (typeof session.setConnection === "function") {
+                    session.setConnection(connection);
+                }
             }
-            if (typeof session.setConnection === "function") {
-                session.setConnection(connection);
-            }
-            if ((typeof session.checkPermission === "function") && (!session.checkPermission(method))) {
-                throw this._errors.permission;
+            if (this._methods[method].public === false) {
+                if ((session === null) || ((typeof session.checkPermission === "function") && (!session.checkPermission(method)))) {
+                    throw this._errors.permission;
+                }
             }
         }
         

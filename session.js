@@ -71,7 +71,7 @@ class Session {
     }
     
     getPermissions() {
-        let userPermissions = this._user ? this._user.getPermissions() : [];
+        let userPermissions = this._user ? ((typeof this._user.getPermissions === "function") ? this._user.getPermissions() : []) : [];
         return this._permissions.concat(userPermissions);
     }
     
@@ -276,7 +276,7 @@ class SessionManager {
         }
         let user = session.getUser();
         return {
-            user: user ? user.serialize() : null,
+            user: (user !== null) ? user.serialize() : null,
             permissions: session.getPermissions()
         };
     }

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="">
+  <head>
+    <meta charset="utf-8">
+    <title>API test</title>
+  </head>
+  <body onload="start();">
+    <div>Status: <pre id="status">unknown</pre></div>
+    <hr />
+    <div>Session: <pre id="session">unknown</pre></div>
+    <hr />
+    <div>Ping: <pre id="ping">none</pre></div>
+    <hr />
+    <div id="loginForm">
+    <div>Login: <input type="text" id="username" value="" placeholder="username" /><input type="password" id="password" value="" placeholder="password" /></div>
+    <hr />
+    </div>
+    <div><button type="button" onclick="app.ping();">Ping</button><button type="button" onclick="app.login();" id="loginButton">Login</button><button type="button" onclick="app.logout();">Logout</button></div>
+    <hr />
+    <pre>You can execute API methods using the developer console by executing "app.call(method, parameters);".</pre>
+    <script type="text/javascript" src="apiclient.js"></script>
+    <script type="text/javascript" src="app.js"></script>
+  </body>
+</html>
