@@ -74,6 +74,18 @@ class Session {
         let userPermissions = this._user ? ((typeof this._user.getPermissions === "function") ? this._user.getPermissions() : []) : [];
         return this._permissions.concat(userPermissions);
     }
+
+    checkPermission(method) {
+        for (let index = 0; index < this._permissions.length; index++) {
+            if (method.startsWith(this._permissions[index])) {
+                return true;
+            }
+        }
+        if ((this._user !== null) && (typeof this._user.checkPermission === "function")) {
+            return this._user.checkPermission(method);
+        }
+        return false;
+    }
     
     addPermission(permission) {
         let result = false;
