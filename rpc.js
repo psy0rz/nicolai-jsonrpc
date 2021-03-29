@@ -304,7 +304,7 @@ class Rpc {
         }
         
         // 3) Check if the client has provided valid parameters
-        if (typeof this._methods[method].parameters !== "undefined") {			
+        if ((typeof this._methods[method].parameters !== "undefined") && (this._methods[method].parameters !== null)) {
             let accepted = false;
             let reason = "";
             for (var i = 0; i < this._methods[method].parameters.length; i++) {
