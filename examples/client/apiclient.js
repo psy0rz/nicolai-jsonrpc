@@ -19,6 +19,7 @@ class ApiClient {
         this.cookie = this._getCookie();
         this.token = ("session" in this.cookie) ? this.cookie.session : null;
         this.session = null;
+        this.tokenInvalidCnt = 0;
     }
 
     connect() {
@@ -98,12 +99,11 @@ class ApiClient {
         if (this.connected) {
             clearTimeout(this.pingTimeout);
             clearTimeout(this.pingRequestTimeout);
-            this.pingTimeout = setTimeout(this._onPingTimeout.bind(this), 1000);
+            this.pingTimeout = setTimeout(this._onPingTimeout.bind(this), 10000);
             if (this.token !== null) {
                 this.request("session/state", null, this._onSessionStateResponse.bind(this));
             } else {
-                console.log("No token");
-                this.request("session/create", null, this._onSessionCreateResponse.bind(this));
+                this.request("session/create", null, this._onSessionCreateResponse.bind(this)); // Create new session
             }
         }
     }
@@ -157,15 +157,25 @@ class ApiClient {
         this.pingRequestTimeout = setTimeout(this._ping.bind(this), 2000);
         if (error) {
             if (error.code === -32001) {
-                console.error("Session token is invalid");
-                this.token = null; // Session is invalid
+                console.error("Session token is invalid", error);
+                if (this.tokenInvalidCnt < 3) {
+                    this.cookie = this._getCookie();
+                    this.token = ("session" in this.cookie) ? this.cookie.session : null;
+                    this.tokenInvalidCnt++;
+                    console.log("Trying again", this.tokenInvalidCnt);
+                } else {
+                    this.token = null; // Session is invalid
+                    this._storeCookie({"session": null});
+                    console.log("Giving up", this.tokenInvalidCnt);
+                }
                 this.session = null;
-                if (typeof this.onSession === "function") {
+                if ((this.session) && (typeof this.onSession === "function")) {
                     this.onSession(null);
                 }
             }
         }
         if (result) {
+            this.tokenInvalidCnt = 0;
             this.session = result;
             if (typeof this.onSession === "function") {
                 this.onSession(result);
@@ -212,6 +222,22 @@ class ApiClient {
         } catch(err) {
             this._handleError("exception while handling event response", err);
         }
+    }
+
+    pushSubscribe(subject, callback, requestCallback = null) {
+        if (requestCallback === null) {
+            requestCallback = (result, error) => { console.log("Subscribe", result, error); };
+        }
+        this.request("session/push/subscribe", subject, requestCallback);
+        this._wsPushCallbacks[subject] = callback;
+    }
+
+    pushUnsubscribe(subject, requestCallback = null) {
+        if (requestCallback === null) {
+            requestCallback = (result, error) => { console.log("Unsubscribe", result, error); };
+        }
+        this.request("session/push/unsubscribe", subject, requestCallback);
+        delete this._wsPushCallbacks[subject];
     }
 
     generateUid() {
