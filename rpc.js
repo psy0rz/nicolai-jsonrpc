@@ -38,13 +38,15 @@ class Rpc {
             returnError:    { code: -32003, message: ""                      }, // Custom: returned when the executed method throws an Error
             returnCustom:   { code: -32004, message: ""                      }, // Custom: returned when the executed method throws an unknown type of object
         };
-        
+
         // Add a method that returns API usage information
-        this.addMethod('usage', (params, session) => { return this.usage(); }, {type: 'none'}, {type: 'object', description: 'Object describing this API'}, true);
-        
+        // eslint-disable-next-line no-unused-vars
+        this.addMethod("usage", (params, session) => { return this.usage(); }, {type: "none"}, {type: "object", description: "Object describing this API"}, true);
+
         // Add a method that allows for executing a connection test
-        this.addMethod('ping', (params, session) => { return "pong"; }, {type: 'none'}, {type: 'string', description: 'A string containing the text \'pong\''}, true);
-        
+        // eslint-disable-next-line no-unused-vars
+        this.addMethod("ping", (params, session) => { return "pong"; }, {type: "none"}, {type: "string", description: "A string containing the text \"pong\""}, true);
+
         // Add methods for managing sessions
         if (this._sessionManager) {
             if (typeof this._sessionManager.registerRpcMethods === "function") {
@@ -60,7 +62,7 @@ class Rpc {
         if ((parameters === null) && ((constraints.type === "none") || (constraints.type === "null"))) {
             accepted = true;
         } else if (parameters === null) {
-            reason = "Found NULL, expected '" + constraints.type + "' ("+path+")";
+            reason = "Found NULL, expected \"" + constraints.type + "\" ("+path+")";
         }
         // 2) When the function accepts any argument
         if (constraints.type === "any") {
@@ -70,19 +72,19 @@ class Rpc {
         else if ((typeof parameters === "string") && (constraints.type === "string")) {
             accepted = true;
         } else if (typeof parameters === "string") {
-            reason = "Found 'string', expected '" + constraints.type + "' ("+path+")";
+            reason = "Found \"string\", expected \"" + constraints.type + "\" ("+path+")";
         }
         // 4) When the function accepts a number argument
         else if ((typeof parameters === "number") && (constraints.type === "number")) {
             accepted = true;
         } else if (typeof parameters === "number") {
-            reason = "Found 'number', expected '" + constraints.type + "' ("+path+")";
+            reason = "Found \"number\", expected \"" + constraints.type + "\" ("+path+")";
         }
         // 5) When the function accepts a boolean argument
         else if ((typeof parameters === "boolean") && (constraints.type === "boolean")) {
             accepted = true;
         } else if (typeof parameters === "boolean") {
-            reason = "Found 'boolean', expected '" + constraints.type + "' ("+path+")";
+            reason = "Found \"boolean\", expected \"" + constraints.type + "\" ("+path+")";
         }
         // 6) When the function accepts an array
         else if ((typeof parameters === "object") && (Array.isArray(parameters)) && (constraints.type === "array")) {
@@ -100,9 +102,9 @@ class Rpc {
                 accepted = false;
             } else if (typeof constraints.contains === "string") {
                 accepted = true;
-                if (constraints.contains !== 'any') {
-                    for (var i = 0; i < parameters.length; i++) {
-                        if (typeof parameters[i] !== constraints.contains) {
+                if (constraints.contains !== "any") {
+                    for (let index = 0; index < parameters.length; index++) {
+                        if (typeof parameters[index] !== constraints.contains) {
                             reason = "Type mismatch ("+path+")";
                             accepted = false;
                             break;
@@ -111,8 +113,8 @@ class Rpc {
                 }
             } else if (typeof constraints.contains === "object") {
                 accepted = true;
-                for (var i = 0; i < parameters.length; i++) {
-                    const [result, subReason] = this._checkParameters(parameters[i], constraints.contains, path + "[" + i + "]/");
+                for (let index = 0; index < parameters.length; index++) {
+                    const [result, subReason] = this._checkParameters(parameters[index], constraints.contains, path + "@" + index + "/");
                     if (!result) {
                         accepted = false;
                         reason = subReason;
@@ -124,7 +126,7 @@ class Rpc {
                 accepted = true;
             }
         } else if ((typeof parameters === "object") && (Array.isArray(parameters)) && (constraints.type !== "array")) {
-            reason = "Found 'array', expected '" + constraints.type + "' ("+path+")";
+            reason = "Found \"array\", expected \"" + constraints.type + "\" ("+path+")";
         }
         // 7) When the function accepts an object
         else if ((typeof parameters === "object") && (constraints.type === "object")) {
@@ -133,7 +135,7 @@ class Rpc {
             }
             if (parameters === null) {
                 // When the object is null
-                accepted = (typeof constraints.allowNull === 'boolean') && (constraints.allowNull === true);
+                accepted = (typeof constraints.allowNull === "boolean") && (constraints.allowNull === true);
                 if (!accepted) {
                     reason = "Expected element, found NULL ("+path+")";
                 }
@@ -183,20 +185,21 @@ class Rpc {
                         }
                     } else {
                         // The parameter is neither a required or an optional parameter
-                        reason = "Found stray parameter '"+item+"' ("+path+")";
+                        reason = "Found stray parameter \""+item+"\" ("+path+")";
                         accepted = false;
                         break;
                     }
                 }
             }
         } else if ((typeof parameters === "object") && (constraints.type !== "object")) {
-            reason = "Found 'object', expected '" + constraints.type + "' ("+path+")";
+            reason = "Found \"object\", expected \"" + constraints.type + "\" ("+path+")";
         }
         // 8) When the function accepts multiple types
         else if (Array.isArray(constraints.type)) {
             let listOfTypes = constraints.type;
             for (let i = 0; i < listOfTypes.length; i++) {
                 constraints.type = listOfTypes[i];
+                // eslint-disable-next-line no-unused-vars
                 const [result, subReason] = this._checkParameters(parameters, constraints, "[" + i + "]/");
                 if (result) {
                     accepted = true;
@@ -231,34 +234,34 @@ class Rpc {
             throw Error("Expected the method name to be a string");
         }
         if (typeof callback !== "function") {
-            throw Error("Expected the callback for method '" + name + "' to be a function");
+            throw Error("Expected the callback for method \"" + name + "\" to be a function");
         }
         if (callback.length !== 2) {
-            throw Error("The callback function for method '" + name + "' has an invalid amount of arguments");
+            throw Error("The callback function for method \"" + name + "\" has an invalid amount of arguments");
         }
         if (parameters !== null) {
             if (typeof parameters !== "object") {
-                throw Error("Expected the parameter specification for method " + name + "' to be either an object or an array of objects");
+                throw Error("Expected the parameter specification for method \"" + name + "\" to be either an object or an array of objects");
             }
             if (!Array.isArray(parameters)) {
                 parameters = [parameters]; // Encapsulate parameter specifications in an array to allow for supplying multiple specifications
             }
-            for (var i = 0; i < parameters.length; i++) {
-                if (typeof parameters[i].type !== "string") {
-                    throw Error("Expected each parameter specification for method '" + name + "' to contain a type declaration");
+            for (let index = 0; index < parameters.length; index++) {
+                if (typeof parameters[index].type !== "string") {
+                    throw Error("Expected each parameter specification for method \"" + name + "\" to contain a type declaration");
                 }
             }
         }
         if (result !== null) {
             if (typeof result !== "object") {
-                throw Error("Expected the parameter specification for method '" + name + "' to be either an object or an array of objects");
+                throw Error("Expected the parameter specification for method \"" + name + "\" to be either an object or an array of objects");
             }
             if (!Array.isArray(result)) {
                 result = [result]; // Encapsulate result specifications in an array to allow for supplying multiple specifications
             }
-            for (var i = 0; i < result.length; i++) {
-                if (typeof result[i].type !== "string") {
-                    throw Error("Expected each result specification for '" + name + "' to contain a type declaration");
+            for (let index = 0; index < result.length; index++) {
+                if (typeof result[index].type !== "string") {
+                    throw Error("Expected each result specification for \"" + name + "\" to contain a type declaration");
                 }
             }
         }
@@ -289,7 +292,7 @@ class Rpc {
                 }
             }
             if (session !== null) {
-            if (typeof session.use === "function") {
+                if (typeof session.use === "function") {
                     session.use();
                 }
                 if (typeof session.setConnection === "function") {
@@ -369,7 +372,7 @@ class Rpc {
             }
         }
         
-        // 2) If the request isn't an existing object
+        // 2) If the request isn"t an existing object
         if ((typeof request !== "object") || (request === null)) {
             return JSON.stringify({jsonrpc: "2.0", id: null, result: null, error: this._errors.invalid});
         }

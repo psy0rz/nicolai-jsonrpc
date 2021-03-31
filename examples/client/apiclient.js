@@ -23,27 +23,26 @@ class ApiClient {
 
     connect() {
         if ((this.isConnecting === false) && (this.connected === false)) {
-        this.isConnecting = true;
-        if (this.socket !== null) {
-            this.socket.close();
-        }
-        this.socket = new WebSocket(this.server);
-        this.socket.onmessage = this._handleResponse.bind(this);
-        this.socket.onerror = this._handleWsError.bind(this);
-        this.socket.onclose = this._handleClose.bind(this);
-        this.socket.onopen = this._handleOpen.bind(this);
-        this.connectTimeout = setTimeout(this._onConnectTimeout.bind(this), 10000);
+            this.isConnecting = true;
+            if (this.socket !== null) {
+                this.socket.close();
+            }
+            this.socket = new WebSocket(this.server);
+            this.socket.onmessage = this._handleResponse.bind(this);
+            this.socket.onerror = this._handleWsError.bind(this);
+            this.socket.onclose = this._handleClose.bind(this);
+            this.socket.onopen = this._handleOpen.bind(this);
+            this.connectTimeout = setTimeout(this._onConnectTimeout.bind(this), 10000);
         }
     }
 
     _onConnectTimeout() {
         this.isConnecting = false;
         if (this.connected === false) {
-        console.log("Websocket connect timeout");
-        
-        this.connect();
+            console.log("Websocket connect timeout");
+            this.connect();
         } else {
-        console.log("Websocket connect timeout while connected?!");
+            console.log("Websocket connect timeout while connected?!");
         }
     }
 
@@ -81,12 +80,12 @@ class ApiClient {
         this.socket = null;
         clearTimeout(this.pingRequestTimeout);
         clearTimeout(this.pingTimeout);
-        for (var index in this._wsTimeouts) {
-        clearTimeout(this._wsTimeouts[index]);
-        delete this._wsTimeouts[index];
+        for (let index in this._wsTimeouts) {
+            clearTimeout(this._wsTimeouts[index]);
+            delete this._wsTimeouts[index];
         }
-        for (var index in this._wsCallbacks) {
-        delete this._wsCallbacks[index];
+        for (let index in this._wsCallbacks) {
+            delete this._wsCallbacks[index];
         }
         if (typeof this.onClose === "function") {
             this.onClose();
@@ -101,17 +100,17 @@ class ApiClient {
             clearTimeout(this.pingRequestTimeout);
             this.pingTimeout = setTimeout(this._onPingTimeout.bind(this), 1000);
             if (this.token !== null) {
-                this.request('session/state', null, this._onSessionStateResponse.bind(this));
+                this.request("session/state", null, this._onSessionStateResponse.bind(this));
             } else {
                 console.log("No token");
-                this.request('session/create', null, this._onSessionCreateResponse.bind(this));
+                this.request("session/create", null, this._onSessionCreateResponse.bind(this));
             }
         }
     }
     
     logout(callback = null) {
         if (this.connected) {
-            this.request('session/destroy', null, callback);
+            this.request("session/destroy", null, callback);
             this.token = null;
             this.session = null;
             if (typeof this.onSession === "function") {
@@ -126,7 +125,7 @@ class ApiClient {
             if (this.session === null) {
                 throw "Session unavailable";
             }
-            this.request('user/authenticate', {username: username, password: password}, (result, error) => {
+            this.request("user/authenticate", {username: username, password: password}, (result, error) => {
                 this._ping();
                 if (typeof callback === "function") {
                     callback(result, error);
@@ -183,35 +182,35 @@ class ApiClient {
 
     _handleResponse(event) {
         try {
-        var message = JSON.parse(event.data);
-        if (typeof message === 'string') {
-            message = {result: null, err: message};
-        } else {
-            if (typeof message.result === 'undefined') message.result = null;
-            if (typeof message.error === 'undefined') message.error = null;
-        }
-        if ((typeof message.pushMessage === 'boolean') && (message.pushMessage)) {
-            if (message.subject in this._wsPushCallbacks) {
-            this._wsPushCallbacks[message.subject](message.message);
+            var message = JSON.parse(event.data);
+            if (typeof message === "string") {
+                message = {result: null, err: message};
             } else {
-            console.error("Push message ignored, no callback available", message);
+                if (typeof message.result === "undefined") message.result = null;
+                if (typeof message.error === "undefined") message.error = null;
             }
-        } else {
-            if (typeof message.id !== 'undefined') {
-            if (typeof this._wsCallbacks[message.id]==='function') {
-                clearTimeout(this._wsTimeouts[message.id]);
-                this._wsCallbacks[message.id](message.result, message.error);
-                delete this._wsCallbacks[message.id];
-                delete this._wsTimeouts[message.id];
+            if ((typeof message.pushMessage === "boolean") && (message.pushMessage)) {
+                if (message.subject in this._wsPushCallbacks) {
+                    this._wsPushCallbacks[message.subject](message.message);
+                } else {
+                    console.error("Push message ignored, no callback available", message);
+                }
             } else {
-                console.error("Response ignored, no callback available", message);
+                if (typeof message.id !== "undefined") {
+                    if (typeof this._wsCallbacks[message.id]==="function") {
+                        clearTimeout(this._wsTimeouts[message.id]);
+                        this._wsCallbacks[message.id](message.result, message.error);
+                        delete this._wsCallbacks[message.id];
+                        delete this._wsTimeouts[message.id];
+                    } else {
+                        console.error("Response ignored, no callback available", message);
+                    }
+                } else {
+                    this._handleError("no identifier in response", message);
+                }
             }
-            } else {
-            this._handleError("no identifier in response", message);
-            }
-        }
         } catch(err) {
-        this._handleError("exception while handling event response", err);
+            this._handleError("exception while handling event response", err);
         }
     }
 
@@ -219,7 +218,7 @@ class ApiClient {
         return (Date.now().toString(36) + Math.random().toString(36).substr(2, 5)).toUpperCase();
     }
 
-    request(method='ping', params=null, callback=null, timeout=8000) {
+    request(method="ping", params=null, callback=null, timeout=8000) {
         if (this.socket === null) throw "Failed to execute request, no connection with server.";
         var uid = this.generateUid();
         var message = JSON.stringify({
@@ -229,7 +228,7 @@ class ApiClient {
             params: params,
             token: this.token
         });
-        if (typeof callback === 'function') {
+        if (typeof callback === "function") {
             this._wsCallbacks[uid] = callback.bind(this);
             this._wsTimeouts[uid] = setTimeout(this._onRequestTimeout.bind(this, uid), timeout);
         }

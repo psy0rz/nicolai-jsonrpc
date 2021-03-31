@@ -12,7 +12,7 @@ const crypto = require("crypto");
 class Session {
     constructor(aPermissions = [], aRpcMethodPrefix = "") {
         // The unique identifier for this session
-        this._id = crypto.randomBytes(64).toString('base64');
+        this._id = crypto.randomBytes(64).toString("base64");
         
         // Unix timestamps for keeping track of the amount of seconds this session has been idle
         this._dateCreated = Math.floor(Date.now() / 1000);
@@ -90,8 +90,8 @@ class Session {
     addPermission(permission) {
         let result = false;
         if (!this._permissions.includes(permission)) {
-                this._permissions.push(permission);
-                result = true;
+            this._permissions.push(permission);
+            result = true;
         }
         return result;
     }
@@ -106,27 +106,27 @@ class Session {
     }
     
     allowPush() {
-        addPermission(this._parentRpcMethodPrefix + "/" + "subscriptions");
-        addPermission(this._parentRpcMethodPrefix + "/" + "subscribe");
-        addPermission(this._parentRpcMethodPrefix + "/" + "unsubscribe");
+        this.addPermission(this._parentRpcMethodPrefix + "/" + "subscriptions");
+        this.addPermission(this._parentRpcMethodPrefix + "/" + "subscribe");
+        this.addPermission(this._parentRpcMethodPrefix + "/" + "unsubscribe");
     }
-    
+
     denyPush() {
-        removePermission(this._parentRpcMethodPrefix + "/" + "subscriptions");
-        removePermission(this._parentRpcMethodPrefix + "/" + "subscribe");
-        removePermission(this._parentRpcMethodPrefix + "/" + "unsubscribe");
+        this.removePermission(this._parentRpcMethodPrefix + "/" + "subscriptions");
+        this.removePermission(this._parentRpcMethodPrefix + "/" + "subscribe");
+        this.removePermission(this._parentRpcMethodPrefix + "/" + "unsubscribe");
     }
-    
+
     allowManagement() {
-        addPermission(this._parentRpcMethodPrefix + "/" + "management/list");
-        addPermission(this._parentRpcMethodPrefix + "/" + "management/destroy");
+        this.addPermission(this._parentRpcMethodPrefix + "/" + "management/list");
+        this.addPermission(this._parentRpcMethodPrefix + "/" + "management/destroy");
     }
-    
+
     denyManagement() {
-        removePermission(this._parentRpcMethodPrefix + "/" + "management/list");
-        removePermission(this._parentRpcMethodPrefix + "/" + "management/destroy");
+        this.removePermission(this._parentRpcMethodPrefix + "/" + "management/list");
+        this.removePermission(this._parentRpcMethodPrefix + "/" + "management/destroy");
     }
-    
+
     getSubscriptions() {
         return this._subscriptions;
     }
@@ -134,8 +134,8 @@ class Session {
     subscribe(subject) {
         let result = false;
         if (!this._subscriptions.includes(subject)) {
-                this._subscriptions.push(subject);
-                result = true;
+            this._subscriptions.push(subject);
+            result = true;
         }
         return result;
     }
@@ -221,17 +221,11 @@ class SessionManager {
         
         var sessionsToKeep = [];
         for (var i in this.sessions) {
-            
-            var id = this.sessions[i].getIdentifier();
             var unusedSince = now-this.sessions[i].getUsedAt();
-            
             if (unusedSince < this._opts.timeout) {
                 sessionsToKeep.push(this.sessions[i]);
             }
         }
-        
-        var oldAmount = this.sessions.length;
-        var newAmount = sessionsToKeep.length;
         
         this.sessions = sessionsToKeep;
         
@@ -263,7 +257,8 @@ class SessionManager {
     }
     
     /* RPC API functions: management of individual sessions */
-    
+
+    // eslint-disable-next-line no-unused-vars
     async createSession(parameters, session) {
         let newSession = new Session(JSON.parse(JSON.stringify(this._permissionsToAddToNewSessions)), this._rpcMethodPrefix); // The JSON operations here copy the permissions array
         this.sessions.push(newSession);
@@ -311,7 +306,7 @@ class SessionManager {
         if (session === null) {
             throw Error("No session");
         }
-        if (typeof parameters === 'string') {
+        if (typeof parameters === "string") {
             return session.subscribe(parameters);
         } else {
             let result = [];
@@ -326,7 +321,7 @@ class SessionManager {
         if (session === null) {
             throw Error("No session");
         }
-        if (typeof parameters === 'string') {
+        if (typeof parameters === "string") {
             let result = await session.unsubscribe(parameters);
             return result;
         } else {
@@ -339,7 +334,8 @@ class SessionManager {
     }
     
     /* RPC API functions: administrative tasks */
-    
+
+    // eslint-disable-next-line no-unused-vars
     async listSessions(parameters, session) {
         var sessionList = [];
         for (var i in this.sessions) {
@@ -348,6 +344,7 @@ class SessionManager {
         return sessionList;
     }
 
+    // eslint-disable-next-line no-unused-vars
     async destroySession(parameters, session) {
         return this._destroySession(parameters);
     }
