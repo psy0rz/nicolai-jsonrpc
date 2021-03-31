@@ -236,9 +236,6 @@ class Rpc {
         if (typeof callback !== "function") {
             throw Error("Expected the callback for method \"" + name + "\" to be a function");
         }
-        if (callback.length !== 2) {
-            throw Error("The callback function for method \"" + name + "\" has an invalid amount of arguments");
-        }
         if (parameters !== null) {
             if (typeof parameters !== "object") {
                 throw Error("Expected the parameter specification for method \"" + name + "\" to be either an object or an array of objects");
@@ -325,7 +322,7 @@ class Rpc {
         }
         
         // 4) Execute the method
-        return this._methods[method].callback(parameters, session);
+        return this._methods[method].callback(parameters, session, connection);
     }
     
     async _handle(request, connection) {

@@ -27,11 +27,11 @@ class Session {
         // User account associated with this session
         this._user = null;
         
-        // Client currently connected to this session
-        this._connection = null;
-        
         // Push message subscriptions
-        this._subscriptions = null;
+        this._subscriptions = {};
+
+        // Connections
+        this._connections = [];
     }
     
     getIdentifier() {
@@ -52,14 +52,6 @@ class Session {
     use() {
         // Update the timestamp representing the moment this session was last used to the current time
         this._dateLastUsed = Math.floor(Date.now() / 1000);
-    }
-    
-    getConnection() {
-        return this._connection;
-    }
-    
-    setConnection(connection) {
-        this._connection = connection;
     }
     
     setUser(user) {
@@ -106,45 +98,53 @@ class Session {
     }
     
     allowPush() {
-        this.addPermission(this._parentRpcMethodPrefix + "/" + "subscriptions");
-        this.addPermission(this._parentRpcMethodPrefix + "/" + "subscribe");
-        this.addPermission(this._parentRpcMethodPrefix + "/" + "unsubscribe");
+        this.addPermission(this._parentRpcMethodPrefix + "push/subscriptions");
+        this.addPermission(this._parentRpcMethodPrefix + "push/subscribe");
+        this.addPermission(this._parentRpcMethodPrefix + "push/unsubscribe");
     }
 
     denyPush() {
-        this.removePermission(this._parentRpcMethodPrefix + "/" + "subscriptions");
-        this.removePermission(this._parentRpcMethodPrefix + "/" + "subscribe");
-        this.removePermission(this._parentRpcMethodPrefix + "/" + "unsubscribe");
+        this.removePermission(this._parentRpcMethodPrefix + "push/subscriptions");
+        this.removePermission(this._parentRpcMethodPrefix + "push/subscribe");
+        this.removePermission(this._parentRpcMethodPrefix + "push/unsubscribe");
     }
 
     allowManagement() {
-        this.addPermission(this._parentRpcMethodPrefix + "/" + "management/list");
-        this.addPermission(this._parentRpcMethodPrefix + "/" + "management/destroy");
+        this.addPermission(this._parentRpcMethodPrefix + "management/list");
+        this.addPermission(this._parentRpcMethodPrefix + "management/destroy");
     }
 
     denyManagement() {
-        this.removePermission(this._parentRpcMethodPrefix + "/" + "management/list");
-        this.removePermission(this._parentRpcMethodPrefix + "/" + "management/destroy");
+        this.removePermission(this._parentRpcMethodPrefix + "management/list");
+        this.removePermission(this._parentRpcMethodPrefix + "management/destroy");
     }
 
-    getSubscriptions() {
-        return this._subscriptions;
+    getSubscriptions(identifier = "anonymous") {
+        if (identifier in this._subscriptions) {
+            return this._subscriptions[identifier];
+        } else {
+            return [];
+        }
     }
     
-    subscribe(subject) {
+    subscribe(subject, identifier = "anonymous") {
         let result = false;
-        if (!this._subscriptions.includes(subject)) {
-            this._subscriptions.push(subject);
-            result = true;
+        if (identifier in this._subscriptions) {
+            if (!this._subscriptions[identifier].includes(subject)) {
+                this._subscriptions[identifier].push(subject);
+                result = true;
+            }
         }
         return result;
     }
 
-    unsubscribe(subject) {
+    unsubscribe(subject, identifier = "anonymous") {
         let result = false;
-        if (this._subscriptions.includes(subject)) {
-            this._subscriptions = this._subscriptions.filter(item => item !== subject);
-            result = true;
+        if (identifier in this._subscriptions) {
+            if (this._subscriptions[identifier].includes(subject)) {
+                this._subscriptions[identifier] = this._subscriptions[identifier].filter(item => item !== subject);
+                result = true;
+            }
         }
         return result;
     }
@@ -160,24 +160,36 @@ class Session {
             permissions: this._permissions
         };
     }
-    
-    async push(subject, message) {
-        let result = false;
-        if (this._connection !== null) {
-            this._connection.send(JSON.stringify({
-                pushMessage: true,
-                subject: subject,
-                message: message
-            }));
-            result = true;
+
+    setConnection(connection) {
+        if (typeof connection.smIdentifier !== "string") {
+            connection.smIdentifier = crypto.randomBytes(64).toString("base64");
+            this._connections[connection.smIdentifier] = connection;
+            this._subscriptions[connection.smIdentifier] = [];
+            connection.on("close", this._onConnectionClose.bind(this, connection));
         }
-        return result;
     }
 
-    async pushIfSubscribed(subject, message) {
+    _onConnectionClose(connection) {
+        if (connection.smIdentifier in this._connections) {
+            delete this._connections[connection.smIdentifier];
+        }
+        if (connection.smIdentifier in this._subscriptions) {
+            delete this._subscriptions[connection.smIdentifier];
+        }
+    }
+    
+    async push(subject, message, identifier) {
         let result = false;
-        if (this._subscriptions.includes(subject)) {
-            result = await this.push(subject, message);
+        for (let identifier in this._subscriptions) {
+            if (this._subscriptions[identifier].includes(subject)) {
+                this._connections[identifier].send(JSON.stringify({
+                    pushMessage: true,
+                    subject: subject,
+                    message: message
+                }));
+                result = true;
+            }
         }
         return result;
     }
@@ -234,19 +246,17 @@ class SessionManager {
     }
     
     /* System functions */
-    
-    pushIfSubscribed(session, subject, message) {
-        return session.pushIfSubscribed(subject, message);
-    }
 
-    push(session, subject, message) {
-        return session.push(subject, message);
+    push(subject, message) { // Broadcast to all sessions
+        for (let index in this.sessions) {
+            this.sessions[index].push(subject, message);
+        }
     }
     
     getSession(token) {
-        for (var i in this.sessions) {
-            if (this.sessions[i].getIdentifier()===token) {
-                return this.sessions[i];
+        for (let index in this.sessions) {
+            if (this.sessions[index].getIdentifier()===token) {
+                return this.sessions[index];
             }
         }
         return null;
@@ -295,39 +305,57 @@ class SessionManager {
         return session.getPermissions();
     }
     
-    async getSubscriptions(parameters, session) {
+    async getSubscriptions(parameters, session, connection) {
         if (session === null) {
             throw Error("No session");
         }
-        return session.getSubscriptions();
+        if (connection === null) {
+            throw Error("No persistent connection");
+        }
+        if (typeof connection.smIdentifier !== "string") {
+            throw Error("Connection doesn't have an identifier");
+        }
+        return session.getSubscriptions(connection.smIdentifier);
     }
     
-    async subscribe(parameters, session) {
+    async subscribe(parameters, session, connection) {
         if (session === null) {
             throw Error("No session");
         }
+        if (connection === null) {
+            throw Error("No persistent connection");
+        }
+        if (typeof connection.smIdentifier !== "string") {
+            throw Error("Connection doesn't have an identifier");
+        }
         if (typeof parameters === "string") {
-            return session.subscribe(parameters);
+            return session.subscribe(parameters, connection.smIdentifier);
         } else {
             let result = [];
             for (let i = 0; i < parameters.length; i++) {
-                result.push(session.subscribe(parameters[i]));
+                result.push(session.subscribe(parameters[i], connection.smIdentifier));
             }
             return result;
         }
     }
 
-    async unsubscribe(parameters, session) {
+    async unsubscribe(parameters, session, connection) {
         if (session === null) {
             throw Error("No session");
         }
+        if (connection === null) {
+            throw Error("No persistent connection");
+        }
+        if (typeof connection.smIdentifier !== "string") {
+            throw Error("Connection doesn't have an identifier");
+        }
         if (typeof parameters === "string") {
-            let result = await session.unsubscribe(parameters);
+            let result = await session.unsubscribe(parameters, connection.smIdentifier);
             return result;
         } else {
             let result = [];
             for (let i = 0; i < parameters.length; i++) {
-                result.push(session.unsubscribe(parameters[i]));
+                result.push(session.unsubscribe(parameters[i], connection.smIdentifier));
             }
             return result;
         }
@@ -351,16 +379,12 @@ class SessionManager {
 
     registerRpcMethods(rpc, prefix="session") {
         if (prefix!=="") prefix = prefix + "/";
-        
+
         this._rpcMethodPrefix = prefix;
         this._permissionsToAddToNewSessions.push(prefix + "create");
         this._permissionsToAddToNewSessions.push(prefix + "destroy");
         this._permissionsToAddToNewSessions.push(prefix + "state");
         this._permissionsToAddToNewSessions.push(prefix + "permissions");
-        // Subscribing to pushmessages is disabled for unauthenticated users because of the possibility to store and retreive arbitrary data in the topics of subscribed pushmessages
-        //this._permissionsToAddToNewSessions.push(prefix + "push/subscriptions");
-        //this._permissionsToAddToNewSessions.push(prefix + "push/subscribe");
-        //this._permissionsToAddToNewSessions.push(prefix + "push/unsubscribe");
         
         /*
         * Create session

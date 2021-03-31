@@ -2,6 +2,7 @@
 
 const http = require("http");
 const WebSocket = require("ws");
+const crypto = require("crypto");
 
 class Webserver {
     constructor( opts ) {
@@ -17,6 +18,8 @@ class Webserver {
         });
 
         this._ws.on("connection", this._onWsConnect.bind(this));
+        this._ws.on("close", this._onWsClose.bind(this));
+        this._wsPingInterval = setInterval(this._wsPing.bind(this), 2000);
         
         this._webserver = http.createServer(this._handle.bind(this)).listen(
             this._opts.port,
@@ -30,22 +33,42 @@ class Webserver {
             });
         });
     }
-    
+
+    _onWsClose() {
+        clearInterval(this._wsPingInterval);
+    }
+
     _onWsConnect(ws) {
-        let rAddr = ws._socket.remoteAddress;
-        let rPort = ws._socket.remotePort;
+        ws.identifier = crypto.randomBytes(64).toString("base64"); // Used to keep track of connections within the session manager
+        ws.isAlive = true;
         ws.on("message", this._onWsMessage.bind(this, ws));
+        ws.on('pong', this._onWsHeartbeat.bind(this, ws));
     }
         
     _onWsMessage(ws, message) {
-        this._opts.application.handle(message, ws).then((result) => {
+        this._opts.application.handle(message, ws, this._ws).then((result) => {
             ws.send(result);
         }).catch((error) => {
             ws.send(error);
         });
     }
+
+    _wsPing() {
+        this._ws.clients.forEach((ws) => {
+            if (ws.isAlive === false) {
+                return ws.terminate();
+            }
+            ws.isAlive = false;
+            ws.ping(()=>{});
+        });
+    }
+
+    _onWsHeartbeat(ws) {
+        ws.isAlive = true;
+    }
     
     _handle(request, response) {
+        // eslint-disable-next-line no-unused-vars
         const { method, url, headers } = request;
         let body = "";
         request.on("data", (data) => {
@@ -53,7 +76,7 @@ class Webserver {
         });
         request.on("end", () => {
             if (method === "POST") {
-                this._opts.application.handle(body).then((result) => {
+                this._opts.application.handle(body, null, null).then((result) => {
                     response.writeHead(200, {"Content-Type": "application/json"});
                     response.end(result);
                 }).catch((err) => {
@@ -68,7 +91,7 @@ class Webserver {
                 });
             } else {
                 response.writeHead(200, {"Content-Type": "application/json"});
-                response.end(JSON.stringify(this._opts.application.usage()));
+                response.end(this._opts.application.usage());
             }
         });
     }
