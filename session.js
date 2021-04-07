@@ -67,7 +67,7 @@ class Session {
         return this._permissions.concat(userPermissions);
     }
 
-    checkPermission(method) {
+    checkPermission(method, push=false) {
         for (let index = 0; index < this._permissions.length; index++) {
             if (method.startsWith(this._permissions[index])) {
                 return true;
@@ -95,18 +95,6 @@ class Session {
             result = true;
         }
         return result;
-    }
-    
-    allowPush() {
-        this.addPermission(this._parentRpcMethodPrefix + "push/subscriptions");
-        this.addPermission(this._parentRpcMethodPrefix + "push/subscribe");
-        this.addPermission(this._parentRpcMethodPrefix + "push/unsubscribe");
-    }
-
-    denyPush() {
-        this.removePermission(this._parentRpcMethodPrefix + "push/subscriptions");
-        this.removePermission(this._parentRpcMethodPrefix + "push/subscribe");
-        this.removePermission(this._parentRpcMethodPrefix + "push/unsubscribe");
     }
 
     allowManagement() {
@@ -265,6 +253,16 @@ class SessionManager {
     getSessions() {
         return this.sessions;
     }
+
+    addPermissionToNewSessions(permission) {
+        if (!this._permissionsToAddToNewSessions.includes(permission)) {
+            this._permissionsToAddToNewSessions.push(permission);
+        }
+    }
+
+    removePermissionFromNewSessions(permission) {
+         this._permissionsToAddToNewSessions.filter((value) => {return value !== permission})
+    }
     
     /* RPC API functions: management of individual sessions */
 
@@ -329,9 +327,18 @@ class SessionManager {
             throw Error("Connection doesn't have an identifier");
         }
         if (typeof parameters === "string") {
-            return session.subscribe(parameters, connection.smIdentifier);
+            if (session.checkPermission(parameters, true)) {
+                return session.subscribe(parameters, connection.smIdentifier);
+            } else {
+                throw Error("Permission denied");
+            }
         } else {
             let result = [];
+            for (let i = 0; i < parameters.length; i++) {
+                if (!session.checkPermission(parameters[i], true)) {
+                    throw Error("Permission denied");
+                }
+            }
             for (let i = 0; i < parameters.length; i++) {
                 result.push(session.subscribe(parameters[i], connection.smIdentifier));
             }
@@ -385,6 +392,9 @@ class SessionManager {
         this._permissionsToAddToNewSessions.push(prefix + "destroy");
         this._permissionsToAddToNewSessions.push(prefix + "state");
         this._permissionsToAddToNewSessions.push(prefix + "permissions");
+        this._permissionsToAddToNewSessions.push(prefix + "push/subscriptions");
+        this._permissionsToAddToNewSessions.push(prefix + "push/subscribe");
+        this._permissionsToAddToNewSessions.push(prefix + "push/unsubscribe");
         
         /*
         * Create session
@@ -491,7 +501,7 @@ class SessionManager {
         /* 
         * Pushmessages: list of subscriptions
         *
-        * Returns the list of topics subscribed to of the session attached to the request
+        * Returns the list of topics subscribed to the connection of the session attached to the request
         * 
         */
         rpc.addMethod(
@@ -513,7 +523,7 @@ class SessionManager {
         /* 
         * Pushmessages: subscribe to a topic
         *
-        * Adds the supplied topic to the list of topics subscribed to of the session attached to the request
+        * Adds the supplied topic to the list of topics subscribed to the connection of the session attached to the request
         * 
         */
         rpc.addMethod(
@@ -549,7 +559,7 @@ class SessionManager {
         /*
         * Pushmessages: unsubscribe from a topic
         * 
-        * Removes the supplied topic to the list of topics subscribed to of the session attached to the request
+        * Removes the supplied topic to the list of topics subscribed to the connection of the session attached to the request
         * 
         */
         rpc.addMethod(
