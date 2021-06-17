@@ -1,7 +1,6 @@
 "use strict";
 
-const Webserver = require("./webserver.js");
-const { Rpc, SessionManager } = require("simple-json-rpc");
+const { Rpc, SessionManager, Webserver } = require("nicolai-jsonrpc");
 
 var sessionManager = new SessionManager();
 var rpc = new Rpc("Example", sessionManager);

@@ -9,5 +9,6 @@
 
 const Rpc = require("./rpc.js");
 const SessionManager = require("./session.js");
+const Webserver = require("./webserver.js");
 
-module.exports = { Rpc, SessionManager };
+module.exports = { Rpc, SessionManager, Webserver };
