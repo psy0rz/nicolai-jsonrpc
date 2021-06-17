@@ -150,6 +150,9 @@ class Session {
     }
 
     setConnection(connection) {
+        if ((typeof connection !== "object") || (connection === null)) {
+            return;
+        }
         if (typeof connection.smIdentifier !== "string") {
             connection.smIdentifier = crypto.randomBytes(64).toString("base64");
             this._connections[connection.smIdentifier] = connection;
