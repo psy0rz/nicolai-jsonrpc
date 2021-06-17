@@ -91,7 +91,7 @@ class Webserver {
                 });
             } else {
                 response.writeHead(200, {"Content-Type": "application/json"});
-                response.end(this._opts.application.usage());
+                response.end(JSON.stringify(this._opts.application.usage()));
             }
         });
     }

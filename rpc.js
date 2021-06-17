@@ -45,7 +45,7 @@ class Rpc {
 
         // Add a method that allows for executing a connection test
         // eslint-disable-next-line no-unused-vars
-        this.addMethod("ping", (params, session) => { return "pong"; }, {type: "none"}, {type: "string", description: "A string containing the text \"pong\""}, true);
+        this.addMethod("ping", (params, session) => { return "pong"; }, {type: "none"}, {type: "string", description: "A string containing the text 'pong'"}, true);
 
         // Add methods for managing sessions
         if (this._sessionManager) {

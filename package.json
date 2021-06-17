@@ -1,6 +1,6 @@
 {
   "name": "nicolai-jsonrpc",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "A simple JSON RPC 2.0 library",
   "main": "index.js",
   "scripts": {
@@ -18,5 +18,8 @@
   "bugs": {
     "url": "https://github.com/renzenicolai/simple-json-rpc/issues"
   },
-  "homepage": "https://github.com/renzenicolai/simple-json-rpc#readme"
+  "homepage": "https://github.com/renzenicolai/simple-json-rpc#readme",
+  "dependencies": {
+    "ws": "^7.5.0"
+  }
 }
