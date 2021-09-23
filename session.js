@@ -294,7 +294,7 @@ class SessionManager {
         }
         let user = session.getUser();
         return {
-            user: (user !== null) ? user.serialize() : null,
+            user: (user !== null) ? ((typeof user.summarize === "function") ? user.summarize() : user.serialize()) : null,
             permissions: session.getPermissions()
         };
     }
