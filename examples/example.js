@@ -43,7 +43,7 @@ async function authenticate(parameters, session) {
 }
 
 rpc.addMethod(
-    "user/authenticate",
+    "authentication/login",
     authenticate,
     {
         type: "object",
