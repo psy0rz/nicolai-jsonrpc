@@ -110,31 +110,30 @@ class Session {
     getSubscriptions(identifier = "anonymous") {
         if (identifier in this._subscriptions) {
             return this._subscriptions[identifier];
-        } else {
-            return [];
         }
+        throw Error("Unknown connection");
     }
     
     subscribe(subject, identifier = "anonymous") {
-        let result = false;
         if (identifier in this._subscriptions) {
             if (!this._subscriptions[identifier].includes(subject)) {
                 this._subscriptions[identifier].push(subject);
-                result = true;
+                return true;
             }
+            return false;
         }
-        return result;
+        throw Error("Unknown connection");
     }
 
     unsubscribe(subject, identifier = "anonymous") {
-        let result = false;
         if (identifier in this._subscriptions) {
             if (this._subscriptions[identifier].includes(subject)) {
                 this._subscriptions[identifier] = this._subscriptions[identifier].filter(item => item !== subject);
-                result = true;
+                return true;
             }
+            return false;
         }
-        return result;
+        throw Error("Unknown connection");
     }
     
     serialize() {
@@ -150,14 +149,28 @@ class Session {
     }
 
     setConnection(connection) {
+        // Check if the parameter is an object
         if ((typeof connection !== "object") || (connection === null)) {
             return;
         }
+
+        // If the connection object does not have an identifier yet add an identifier
         if (typeof connection.smIdentifier !== "string") {
+            // Generate an identifier
             connection.smIdentifier = crypto.randomBytes(64).toString("base64");
+        }
+        
+        // Add the connection to the connections list if needed
+        if (!(connection.smIdentifier in this._connections)) {
+            // Store the connection object in the list of connections
             this._connections[connection.smIdentifier] = connection;
-            this._subscriptions[connection.smIdentifier] = [];
+            // Add cleanup hook to the connection
             connection.on("close", this._onConnectionClose.bind(this, connection));
+        }
+
+        // Add the connection identifier to the subscriptions list if needed
+        if (!(connection.smIdentifier in this._subscriptions)) {
+            this._subscriptions[connection.smIdentifier] = [];
         }
     }
 
@@ -174,7 +187,7 @@ class Session {
         let result = false;
         for (let identifier in this._subscriptions) {
             if (this._subscriptions[identifier].includes(subject)) {
-                this._connections[identifier].send(JSON.stringify({
+                await this._connections[identifier].send(JSON.stringify({
                     pushMessage: true,
                     subject: subject,
                     message: message

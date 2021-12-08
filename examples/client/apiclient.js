@@ -125,7 +125,7 @@ class ApiClient {
             if (this.session === null) {
                 throw "Session unavailable";
             }
-            this.request("user/authenticate", {username: username, password: password}, (result, error) => {
+            this.request("authentication/login", {name: username, password: password}, (result, error) => {
                 this._ping();
                 if (typeof callback === "function") {
                     callback(result, error);
@@ -158,15 +158,13 @@ class ApiClient {
         if (error) {
             if (error.code === -32001) {
                 console.error("Session token is invalid", error);
-                if (this.tokenInvalidCnt < 3) {
+                if (this.tokenInvalidCnt < 1) {
                     this.cookie = this._getCookie();
                     this.token = ("session" in this.cookie) ? this.cookie.session : null;
                     this.tokenInvalidCnt++;
-                    console.log("Trying again", this.tokenInvalidCnt);
                 } else {
                     this.token = null; // Session is invalid
                     this._storeCookie({"session": null});
-                    console.log("Giving up", this.tokenInvalidCnt);
                 }
                 this.session = null;
                 if ((this.session) && (typeof this.onSession === "function")) {
@@ -201,7 +199,10 @@ class ApiClient {
             }
             if ((typeof message.pushMessage === "boolean") && (message.pushMessage)) {
                 if (message.subject in this._wsPushCallbacks) {
-                    this._wsPushCallbacks[message.subject](message.message);
+                    let callbacks = this._wsPushCallbacks[message.subject];
+                    for (let index = 0; index < callbacks.length; index++) {
+                        callbacks[index](message.message);
+                    }
                 } else {
                     console.error("Push message ignored, no callback available", message);
                 }
@@ -226,18 +227,43 @@ class ApiClient {
 
     pushSubscribe(subject, callback, requestCallback = null) {
         if (requestCallback === null) {
-            requestCallback = (result, error) => { console.log("Subscribe", result, error); };
+            requestCallback = (result, error) => {};
         }
         this.request("session/push/subscribe", subject, requestCallback);
-        this._wsPushCallbacks[subject] = callback;
+        if (!(subject in this._wsPushCallbacks)) {
+            this._wsPushCallbacks[subject] = [];
+        }
+        if (this._wsPushCallbacks[subject].indexOf(callback) < 0) {
+            this._wsPushCallbacks[subject].push(callback);
+        }
     }
 
-    pushUnsubscribe(subject, requestCallback = null) {
+    pushUnsubscribe(subject, callback, requestCallback = null) {
         if (requestCallback === null) {
-            requestCallback = (result, error) => { console.log("Unsubscribe", result, error); };
+            // Dummy callback function
+            requestCallback = (result, error) => {};
         }
-        this.request("session/push/unsubscribe", subject, requestCallback);
-        delete this._wsPushCallbacks[subject];
+        if (!(subject in this._wsPushCallbacks)) {
+            // The subject is not present in the list of callbacks
+            this.request("session/push/unsubscribe", subject, requestCallback);
+            return;
+        }
+        this._wsPushCallbacks[subject] = this._wsPushCallbacks[subject].filter(e => e !== callback);
+        if (this._wsPushCallbacks[subject].length < 1) {
+            // Only unsubscribe after the last subscribed callback is removed
+            delete this._wsPushCallbacks[subject];
+            this.request("session/push/unsubscribe", subject, requestCallback);
+        } else {
+            // Else act like the client has unsubscribed, but keep the subscription for the other callbacks
+            requestCallback(true, null);
+        }
+    }
+
+    pushDebug() {
+        for (let subject in this._wsPushCallbacks) {
+            let callbacks = this._wsPushCallbacks[subject];
+            console.log("Subject '" + subject + "': " + callbacks.length + " callbacks", callbacks);
+        }
     }
 
     generateUid() {
