@@ -185,7 +185,7 @@ class Rpc {
                         }
                     } else {
                         // The parameter is neither a required or an optional parameter
-                        reason = "Found stray parameter \""+item+"\" ("+path+")";
+                        reason = "Found stray parameter " + path + item;
                         accepted = false;
                         break;
                     }

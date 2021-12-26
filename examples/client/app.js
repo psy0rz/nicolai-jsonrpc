@@ -39,6 +39,70 @@ class App {
                 document.getElementById("loginButton").disabled = true;
             }
         }
+        
+        this.apiClient.request("usage", null, this._onUsage.bind(this));
+    }
+    
+    _onUsage(data) {
+        let output = "<h1>"+data.service+"</h1>";
+        output += "<table><tr><th>Method</th><th>Parameters</th><th>Result</th><th>Public</th>";
+        for (let method in data.methods) {
+            let parameters = data.methods[method].parameters;
+            let results = data.methods[method].result;
+            output += "<tr>";
+            output += "<td>" + method + "</td>";
+            let paramOutput = "";
+            for (let paramIndex = 0; paramIndex < parameters.length; paramIndex++) {
+                let description = parameters[paramIndex].description;
+                if (typeof description !== "string") description = "";
+                let paramDesc = "<pre>" + JSON.stringify(parameters[paramIndex], null, 2) + "</pre>";
+                if (parameters[paramIndex].type === "none") {
+                    paramDesc = "None";
+                }
+                if (parameters[paramIndex].type === "string") {
+                    paramDesc = "String: " + description.toLowerCase();
+                }
+                if (parameters[paramIndex].type === "boolean") {
+                    paramDesc = "Boolean: " + description.toLowerCase();
+                }
+                if (parameters[paramIndex].type === "array") {
+                    paramDesc = "Array of " + parameters[paramIndex].contains + "s: " + description.toLowerCase();
+                }
+                if (parameters[paramIndex].type === "object") {
+                    paramDesc = "Object: " + description.toLowerCase();
+                }
+                paramOutput += "<tr><td>"+paramDesc+"</td></tr>";
+            }
+            output += "<td><table>" + paramOutput + "</table></td>";
+            let resultOutput = "";
+            for (let resultIndex = 0; resultIndex < results.length; resultIndex++) {
+                let description = results[resultIndex].description;
+                if (typeof description !== "string") description = "";
+                let resultDesc = "<pre>" + JSON.stringify(results[resultIndex], null, 2) + "</pre>";
+                if (results[resultIndex].type === "none") {
+                    resultDesc = "None";
+                }
+                if (results[resultIndex].type === "string") {
+                    resultDesc = "String: " + description.toLowerCase();
+                }
+                if (results[resultIndex].type === "boolean") {
+                    resultDesc = "Boolean: " + description.toLowerCase();
+                }
+                if (results[resultIndex].type === "array") {
+                    resultDesc = "Array of " + results[resultIndex].contains + "s: " + description.toLowerCase();
+                }
+                if (results[resultIndex].type === "object") {
+                    resultDesc = "Object: " + description.toLowerCase();
+                }
+                resultOutput += "<tr><td>"+resultDesc+"</td></tr>";
+            }
+            output += "<td><table>" + resultOutput + "</table></td>";
+            output += "<td>" + (data.methods[method].public ? "Yes" : "No") + "</td>";
+            output += "</tr>";
+        }
+        output += "</table>";
+        document.getElementById("methods").innerHTML = output;
+        
     }
     
     ping() {

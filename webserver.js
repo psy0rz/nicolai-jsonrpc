@@ -10,7 +10,8 @@ class Webserver {
             port: 8080,
             host: "0.0.0.0",
             queue: 512,
-            application: null
+            application: null,
+            timeout: 30000
         }, opts);
 
         this._ws = new WebSocket.Server({
@@ -19,7 +20,7 @@ class Webserver {
 
         this._ws.on("connection", this._onWsConnect.bind(this));
         this._ws.on("close", this._onWsClose.bind(this));
-        this._wsPingInterval = setInterval(this._wsPing.bind(this), 2000);
+        this._wsPingInterval = setInterval(this._wsPing.bind(this), this._opts.timeout);
         
         this._webserver = http.createServer(this._handle.bind(this)).listen(
             this._opts.port,
@@ -34,7 +35,8 @@ class Webserver {
         });
     }
 
-    _onWsClose() {
+    _onWsClose(code, data) {
+        //const reason = data.toString();
         clearInterval(this._wsPingInterval);
     }
 
@@ -45,7 +47,8 @@ class Webserver {
         ws.on('pong', this._onWsHeartbeat.bind(this, ws));
     }
         
-    _onWsMessage(ws, message) {
+    _onWsMessage(ws, data, isBinary) {
+        let message = isBinary ? data : data.toString();
         this._opts.application.handle(message, ws, this._ws).then((result) => {
             ws.send(result);
         }).catch((error) => {

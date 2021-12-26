@@ -2,21 +2,34 @@
 <html lang="">
   <head>
     <meta charset="utf-8">
-    <title>API test</title>
+    <title>Nicolai JSON RPC example client</title>
+    <style>
+        html, body {
+            font-family: 'arial', 'sans-serif';
+            font-size: 12px;
+            padding: 0px;
+            margin: 0px;
+        }
+        h1 {
+            color: #000000;
+            text-align: center;
+        }
+        .section {
+            width: 100%;
+            padding: 5px;
+            border-bottom: 1px solid #444444;
+        }
+    </style>
   </head>
   <body onload="start();">
-    <div>Status: <pre id="status">unknown</pre></div>
-    <hr />
-    <div>Session: <pre id="session">unknown</pre></div>
-    <hr />
-    <div>Ping: <pre id="ping">none</pre></div>
-    <hr />
-    <div id="loginForm">
+    <div class="section">Status: <span id="status">unknown</span></div>
+    <div class="section" id="methods">...</div>
+    <div class="section">Session: <pre id="session">unknown</pre></div>
+    <div class="section">Ping: <pre id="ping">none</pre></div>
+    <div class="section" id="loginForm">
     <div>Login: <input type="text" id="username" value="" placeholder="username" /><input type="password" id="password" value="" placeholder="password" /></div>
-    <hr />
     </div>
-    <div><button type="button" onclick="app.ping();">Ping</button><button type="button" onclick="app.login();" id="loginButton">Login</button><button type="button" onclick="app.logout();">Logout</button></div>
-    <hr />
+    <div class="section"><button type="button" onclick="app.ping();">Ping</button><button type="button" onclick="app.login();" id="loginButton">Login</button><button type="button" onclick="app.logout();">Logout</button></div>
     <pre>You can execute API methods using the developer console by executing "app.call(method, parameters);".</pre>
     <script type="text/javascript" src="apiclient.js"></script>
     <script type="text/javascript" src="app.js"></script>

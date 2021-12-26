@@ -6,19 +6,19 @@ var sessionManager = new SessionManager();
 var rpc = new Rpc("Example", sessionManager);
 
 var webserver = new Webserver({
-    port: 8080,
+    port: 8000,
     host: "0.0.0.0",
     application: rpc
 });
 
 class User {
-    constructor(username) {
-        this.username = username;
+    constructor(name) {
+        this.name = name;
         this.permissions = [];
     }
     
     serialize() {
-        return {username: this.username};
+        return {name: this.name};
     }
     
     getPermissions() {
@@ -39,7 +39,7 @@ async function authenticate(parameters, session) {
     if (session === null) {
         throw "Invalid session";
     }
-    session.setUser(new User(parameters.username));
+    session.setUser(new User(parameters.name));
 }
 
 rpc.addMethod(
@@ -48,7 +48,7 @@ rpc.addMethod(
     {
         type: "object",
         required: {
-            username: {
+            name: {
                 type: "string"
             }
         },
