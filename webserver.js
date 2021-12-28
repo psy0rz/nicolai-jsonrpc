@@ -11,7 +11,9 @@ class Webserver {
             host: "0.0.0.0",
             queue: 512,
             application: null,
-            timeout: 30000
+            timeout: 30000,
+            usage: true,
+            homepage: "<h1>API server</h1>"
         }, opts);
 
         this._ws = new WebSocket.Server({
@@ -92,9 +94,12 @@ class Webserver {
                         throw err;
                     }
                 });
-            } else {
+            } else if (this._opts.usage) {
                 response.writeHead(200, {"Content-Type": "application/json"});
                 response.end(JSON.stringify(this._opts.application.usage()));
+            } else {
+                response.writeHead(200, {"Content-Type": "text/html"});
+                response.end(this._opts.homepage);
             }
         });
     }

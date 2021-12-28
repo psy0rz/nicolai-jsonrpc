@@ -108,16 +108,34 @@ class App {
     ping() {
         try {
             this.apiClient.request("ping", null, (result, error) => {
-                if (error === null) {
-                    console.log("Ping succesfull");
-                    document.getElementById("ping").innerHTML = "OK";
-                } else {
+                if (error !== null) {
                     console.log("Ping error:", error);
-                    document.getElementById("ping").innerHTML = error;
+                    alert("Ping failed: " + error.message);
+                }
+                if (result !== null) {
+                    alert(result);
                 }
             });
         } catch (error) {
-            document.getElementById("ping").innerHTML = error;
+            console.log("Ping JS error:", error);
+            alert("Ping failed and a Javascript error occured!");
+        }
+    }
+    
+    example() {
+        try {
+            this.apiClient.request("example", [1,1], (result, error) => {
+                if (error !== null) {
+                    console.log("Example error:", error);
+                    alert("Executing the example method failed: " + error.message);
+                }
+                if (result !== null) {
+                    alert(result);
+                }
+            });
+        } catch (error) {
+            console.log("Example JS error:", error);
+            alert("A Javascript error occured when executing the example method!");
         }
     }
     

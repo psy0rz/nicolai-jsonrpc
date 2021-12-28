@@ -1,30 +1,21 @@
 /**
-* @license
-* Copyright 2021 Renze Nicolai
-* This code is released under the MIT license.
-* SPDX-License-Identifier: MIT
-*/
-
-/**
- * @tutorial
- * Creating an API is done by instantiating the RPC class with
- * 
- * Optional parameters:
- *  - An identity: a string containing the name of the API
- *  - A session manager object which implements a getSession(token) function which returns a session
- * 
- * A session may implement the following functions:
- *  - setConnection(connection)
- *  - checkPermission(method) -> bool : a function which returns a boolean indicating weither or not the requested method may be executed
+ * RPC library
+ *
+ * Copyright 2021 Renze Nicolai
+ * This code is released under the MIT license.
+ * SPDX-License-Identifier: MIT
  */
 
 "use strict";
 
+const checkParameters = require("./checkParameters.js");
+
 class Rpc {
-    constructor(aIdentity = "", aSessionManager = null) {
+    constructor(aIdentity = "", aSessionManager = null, aEnablePing = true, aEnableUsage = true) {
         this._identity = aIdentity;
         this._sessionManager = aSessionManager;
         this._methods = {};
+        this._enableUsage = aEnableUsage;
         
         this._errors = {
             parse:          { code: -32700, message: "Parse error"           }, // As defined in JSON-RPC 2.0
@@ -39,13 +30,17 @@ class Rpc {
             returnCustom:   { code: -32004, message: ""                      }, // Custom: returned when the executed method throws an unknown type of object
         };
 
-        // Add a method that returns API usage information
-        // eslint-disable-next-line no-unused-vars
-        this.addMethod("usage", (params, session) => { return this.usage(); }, {type: "none"}, {type: "object", description: "Object describing this API"}, true);
+        if (aEnablePing) {
+            // Add a method that returns API usage information
+            // eslint-disable-next-line no-unused-vars
+            this.addMethod("usage", (params, session) => { return this.usage(); }, {type: "none"}, {type: "object", description: "Object describing this API"}, true);
+        }
 
-        // Add a method that allows for executing a connection test
-        // eslint-disable-next-line no-unused-vars
-        this.addMethod("ping", (params, session) => { return "pong"; }, {type: "none"}, {type: "string", description: "A string containing the text 'pong'"}, true);
+        if (aEnableUsage) {
+            // Add a method that allows for executing a connection test
+            // eslint-disable-next-line no-unused-vars
+            this.addMethod("ping", (params, session) => { return "pong"; }, {type: "none"}, {type: "string", description: "A string containing the text 'pong'"}, true);
+        }
 
         // Add methods for managing sessions
         if (this._sessionManager) {
@@ -54,167 +49,16 @@ class Rpc {
             }
         }
     }
-
-    _checkParameters(parameters, constraints, path="/") {
-        let accepted = false;
-        let reason = "Unspecified ("+path+")";
-        // 1) When no parameters are supplied
-        if ((parameters === null) && ((constraints.type === "none") || (constraints.type === "null"))) {
-            accepted = true;
-        } else if (parameters === null) {
-            reason = "Found NULL, expected \"" + constraints.type + "\" ("+path+")";
-        }
-        // 2) When the function accepts any argument
-        if (constraints.type === "any") {
-            accepted = true;
-        }
-        // 3) When the function accepts a string argument
-        else if ((typeof parameters === "string") && (constraints.type === "string")) {
-            accepted = true;
-        } else if (typeof parameters === "string") {
-            reason = "Found \"string\", expected \"" + constraints.type + "\" ("+path+")";
-        }
-        // 4) When the function accepts a number argument
-        else if ((typeof parameters === "number") && (constraints.type === "number")) {
-            accepted = true;
-        } else if (typeof parameters === "number") {
-            reason = "Found \"number\", expected \"" + constraints.type + "\" ("+path+")";
-        }
-        // 5) When the function accepts a boolean argument
-        else if ((typeof parameters === "boolean") && (constraints.type === "boolean")) {
-            accepted = true;
-        } else if (typeof parameters === "boolean") {
-            reason = "Found \"boolean\", expected \"" + constraints.type + "\" ("+path+")";
-        }
-        // 6) When the function accepts an array
-        else if ((typeof parameters === "object") && (Array.isArray(parameters)) && (constraints.type === "array")) {
-            if ((typeof constraints.length === "number") && (parameters.length !== constraints.length)) {
-                // Length is defined and does not match
-                reason = "Length mismatch ("+path+")";
-                accepted = false;
-            } else if ((typeof constraints.minlength === "number") && (parameters.length < constraints.minlength)) {
-                // Minimum length is defined and does not match
-                reason = "Length less than minimum ("+path+")";
-                accepted = false;
-            } else if ((typeof constraints.maxlength === "number") && (parameters.length > constraints.maxlength)) {
-                // Maximum length is defined and does not match
-                reason = "Length larger than maximum ("+path+")";
-                accepted = false;
-            } else if (typeof constraints.contains === "string") {
-                accepted = true;
-                if (constraints.contains !== "any") {
-                    for (let index = 0; index < parameters.length; index++) {
-                        if (typeof parameters[index] !== constraints.contains) {
-                            reason = "Type mismatch ("+path+")";
-                            accepted = false;
-                            break;
-                        }
-                    }
-                }
-            } else if (typeof constraints.contains === "object") {
-                accepted = true;
-                for (let index = 0; index < parameters.length; index++) {
-                    const [result, subReason] = this._checkParameters(parameters[index], constraints.contains, path + "@" + index + "/");
-                    if (!result) {
-                        accepted = false;
-                        reason = subReason;
-                        break;
-                    }
-                }
-            } else {
-                // No valid constraints found for the contents of the array
-                accepted = true;
-            }
-        } else if ((typeof parameters === "object") && (Array.isArray(parameters)) && (constraints.type !== "array")) {
-            reason = "Found \"array\", expected \"" + constraints.type + "\" ("+path+")";
-        }
-        // 7) When the function accepts an object
-        else if ((typeof parameters === "object") && (constraints.type === "object")) {
-            if ((typeof constraints.contains === "object") && (typeof constraints.required === "undefined")) {
-                constraints.required = constraints.contains;
-            }
-            if (parameters === null) {
-                // When the object is null
-                accepted = (typeof constraints.allowNull === "boolean") && (constraints.allowNull === true);
-                if (!accepted) {
-                    reason = "Expected element, found NULL ("+path+")";
-                }
-            } else if ((typeof constraints.required === "undefined") && (typeof constraints.optional === "undefined")) {
-                // When the object has no constraints
-                accepted = true;
-            } else {
-                accepted = true;
-                // When the object has required parameters
-                if (typeof constraints.required !== "undefined") {
-                    for (let item in constraints.required) {
-                        if (typeof parameters[item] === "undefined") {
-                            // And a required parameter is missing
-                            reason = "Required parameter is missing ("+path+")";
-                            accepted = false;
-                            break;
-                        }
-                        if (typeof constraints.required[item].type !== "undefined") {
-                            // If constraints are set for the content of the required parameter
-                            const [result, subReason] = this._checkParameters(parameters[item], constraints.required[item], path + item + "/");
-                            if (!result) {
-                                // The constraints of the parameter were not met
-                                accepted = false;
-                                reason = subReason;
-                                break;
-                            }
-                        }
-                    }
-                }
-                
-                // Check that the object does not contain stray parameters
-                for (let item in parameters) {
-                    if ((typeof constraints.required !== "undefined") && (item in constraints.required)) {
-                        // The parameter is a required parameter
-                        continue;
-                    } else if ((typeof constraints.optional !== "undefined") && (item in constraints.optional)) {
-                        // The parameter is an optional parameter
-                        if (typeof constraints.optional[item].type !== "undefined") {
-                            // If constraints are set for the contents of the optional parameter
-                            const [result, subReason] = this._checkParameters(parameters[item], constraints.optional[item], path + item + "/");
-                            if (!result) {
-                                // The constraints of the parameter were not met
-                                accepted = false;
-                                reason = subReason;
-                                break;
-                            }
-                        }
-                    } else {
-                        // The parameter is neither a required or an optional parameter
-                        reason = "Found stray parameter " + path + item;
-                        accepted = false;
-                        break;
-                    }
-                }
-            }
-        } else if ((typeof parameters === "object") && (constraints.type !== "object")) {
-            reason = "Found \"object\", expected \"" + constraints.type + "\" ("+path+")";
-        }
-        // 8) When the function accepts multiple types
-        else if (Array.isArray(constraints.type)) {
-            let listOfTypes = constraints.type;
-            for (let i = 0; i < listOfTypes.length; i++) {
-                constraints.type = listOfTypes[i];
-                // eslint-disable-next-line no-unused-vars
-                const [result, subReason] = this._checkParameters(parameters, constraints, "[" + i + "]/");
-                if (result) {
-                    accepted = true;
-                    break;
-                }
-            }
-        }
-        return [accepted, reason];
-    }
     
     usage() {
-        return {
-            service: this._identity,
-            methods: this.listMethods()
-        };
+        if (this._enableUsage) {
+            return {
+                service: this._identity,
+                methods: this.listMethods()
+            };
+        } else {
+            return {};
+        }
     }
     
     listMethods() {
@@ -309,7 +153,7 @@ class Rpc {
             let reason = "";
             for (var i = 0; i < this._methods[method].parameters.length; i++) {
                 let constraints = this._methods[method].parameters[i];
-                const [result, subReason] = this._checkParameters(parameters, constraints);
+                const [result, subReason] = checkParameters(parameters, constraints);
                 reason = subReason;
                 if (result) {
                     accepted = true;

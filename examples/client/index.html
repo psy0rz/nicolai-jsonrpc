@@ -23,14 +23,22 @@
   </head>
   <body onload="start();">
     <div class="section">Status: <span id="status">unknown</span></div>
-    <div class="section" id="methods">...</div>
-    <div class="section">Session: <pre id="session">unknown</pre></div>
-    <div class="section">Ping: <pre id="ping">none</pre></div>
     <div class="section" id="loginForm">
     <div>Login: <input type="text" id="username" value="" placeholder="username" /><input type="password" id="password" value="" placeholder="password" /></div>
     </div>
-    <div class="section"><button type="button" onclick="app.ping();">Ping</button><button type="button" onclick="app.login();" id="loginButton">Login</button><button type="button" onclick="app.logout();">Logout</button></div>
+    <div class="section">
+        Methods built into the RPC library:
+        <button type="button" onclick="app.ping();">Ping</button>
+    </div>
+    <div class="section">
+        Methods provided by the session manager example:
+        <button type="button" onclick="app.login();" id="loginButton">Login</button>
+        <button type="button" onclick="app.logout();">Logout</button>
+        <button type="button" onclick="app.example();">Example</button>
+    </div>
     <pre>You can execute API methods using the developer console by executing "app.call(method, parameters);".</pre>
+    <div class="section" id="methods">...</div>
+    <div class="section">Session: <pre id="session">unknown</pre></div>
     <script type="text/javascript" src="apiclient.js"></script>
     <script type="text/javascript" src="app.js"></script>
   </body>
