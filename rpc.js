@@ -12,11 +12,12 @@
 const checkParameters = require("./checkParameters.js");
 
 class Rpc {
-    constructor(aIdentity = "", aSessionManager = null, aEnablePing = true, aEnableUsage = true) {
+    constructor(aIdentity = "", aSessionManager = null, aEnablePing = true, aEnableUsage = true, aVerbose = true) {
         this._identity = aIdentity;
         this._sessionManager = aSessionManager;
         this._methods = {};
         this._enableUsage = aEnableUsage;
+        this._verbose = aVerbose;
         
         this._errors = {
             parse:          { code: -32700, message: "Parse error"           }, // As defined in JSON-RPC 2.0
@@ -202,6 +203,9 @@ class Rpc {
                 }
             } else {
                 response.error = this._errors.internal;
+            }
+            if (this._verbose) {
+                console.error("RPC call to '" + request.method + "' failed", error);
             }
         }
         return response;
