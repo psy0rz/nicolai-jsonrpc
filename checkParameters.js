@@ -32,7 +32,8 @@ function checkParameters(parameters, constraints, path="/") {
         } else if (typeof constraints.type === "undefined") {
             return [true, "Constraints don't specify a type"];
         } else if (typeof constraints.type !== "string") {
-            throw Error("Expected constraints to contain a type (string)");
+            console.error("Constraints don't contain a type", constraints, "Path:", path);
+            throw Error("Expected constraints to contain a type (" + path + ")");
         }
         switch (constraints.type) {
             case "any":
@@ -86,14 +87,25 @@ function checkArray(parameters, constraints, path="/") {
         }
     } else if (Array.isArray(constraints.contains)) {
         for (let index = 0; index < parameters.length; index++ ) {
-            let [result, reason] = checkParameters(parameters[index], { type: constraints.contains }, "[" + index + "]" + path);
+            let result = false;
+            let reason = "";
+            for (let constraintIndex = 0; constraintIndex < constraints.contains.length; constraintIndex++) {
+                let constraint = constraints.contains[constraintIndex];
+                if (typeof constraint === "string") {
+                    constraint = {type: constraint};
+                }
+                [result, reason] = checkParameters(parameters[index], constraint, "[" + index + "]" + path);
+                if (result) {
+                    break;
+                }
+            }
             if (!result) {
                 return [result, reason];
             }
         }
     } else if (typeof constraints.contains === "object") {
         for (let index = 0; index < parameters.length; index++ ) {
-            let [result, reason] = checkParameters(parameters[index], { type: constraints.contains }, "[" + index + "]" + path);
+            let [result, reason] = checkParameters(parameters[index], constraints.contains, "[" + index + "]" + path);
             if (!result) {
                 return [result, reason];
             }
