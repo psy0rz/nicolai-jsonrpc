@@ -1,9 +1,11 @@
 /**
-* @license
-* Copyright 2021 Renze Nicolai
-* This code is released under the MIT license.
-* SPDX-License-Identifier: MIT
-*/
+ * Session management
+ *
+ * @license
+ * Copyright 2022 Renze Nicolai
+ * This code is released under the MIT license.
+ * SPDX-License-Identifier: MIT
+ */
 
 "use strict";
 
@@ -21,7 +23,7 @@ class Session {
         // Prefix for RPC methods of the SessionManager
         this._parentRpcMethodPrefix = aRpcMethodPrefix;
         
-        // List of methods which this session may call, regardless of weither or not the sessions user may call the method
+        // List of methods which this session may call (may be extended by the associated user account)
         this._permissions = aPermissions;
         
         // User account associated with this session
@@ -55,66 +57,67 @@ class Session {
     }
     
     setUser(user) {
+        // Set the associated user account, to remove the associated account the user must be set to null
         this._user = user;
     }
     
     getUser() {
+        // Get the associated user account
         return this._user;
     }
     
     getPermissions() {
+        // Get the full list of methods this session is permitted to call
         let userPermissions = this._user ? ((typeof this._user.getPermissions === "function") ? this._user.getPermissions() : []) : [];
         return this._permissions.concat(userPermissions);
     }
 
-    checkPermission(method, push=false) {
+    checkPermission(methodName) {
+        // Check weither or not a specific method may be called by this session
         for (let index = 0; index < this._permissions.length; index++) {
-            if (method.startsWith(this._permissions[index])) {
+            if (this._permissions[index] === methodName) {
                 return true;
             }
         }
         if ((this._user !== null) && (typeof this._user.checkPermission === "function")) {
-            return this._user.checkPermission(method);
+            return this._user.checkPermission(methodName);
         }
         return false;
     }
     
-    addPermission(permission) {
+    addPermission(methodName) {
+        // Add a method name to the permissions list
         let result = false;
-        if (!this._permissions.includes(permission)) {
-            this._permissions.push(permission);
+        if (!this._permissions.includes(methodName)) {
+            this._permissions.push(methodName);
             result = true;
         }
         return result;
     }
     
-    removePermission(permission) {
+    removePermission(methodName) {
+        // Remove a method name from the permissions list
         let result = false;
-        if (this._permissions.includes(permission)) {
-            this._permissions = this._permissions.filter(item => item !== permission);
+        if (this._permissions.includes(methodName)) {
+            this._permissions = this._permissions.filter(item => item !== methodName);
             result = true;
         }
         return result;
-    }
-
-    allowManagement() {
-        this.addPermission(this._parentRpcMethodPrefix + "management/list");
-        this.addPermission(this._parentRpcMethodPrefix + "management/destroy");
-    }
-
-    denyManagement() {
-        this.removePermission(this._parentRpcMethodPrefix + "management/list");
-        this.removePermission(this._parentRpcMethodPrefix + "management/destroy");
     }
 
     getSubscriptions(identifier = "anonymous") {
+        // Get the list of subscriptions for a specific connection identifier
         if (identifier in this._subscriptions) {
             return this._subscriptions[identifier];
         }
-        throw Error("Unknown connection");
+        throw new Error("Unknown connection");
     }
     
     subscribe(subject, identifier = "anonymous") {
+        // Subscribe to a pushmessage topic
+        if (!this.checkPermission(subject)) {
+            throw new Error("Access denied");
+        }
         if (identifier in this._subscriptions) {
             if (!this._subscriptions[identifier].includes(subject)) {
                 this._subscriptions[identifier].push(subject);
@@ -122,10 +125,11 @@ class Session {
             }
             return false;
         }
-        throw Error("Unknown connection");
+        throw new Error("Unknown connection");
     }
 
     unsubscribe(subject, identifier = "anonymous") {
+        // Unsubscribe from a pushmessage topic
         if (identifier in this._subscriptions) {
             if (this._subscriptions[identifier].includes(subject)) {
                 this._subscriptions[identifier] = this._subscriptions[identifier].filter(item => item !== subject);
@@ -133,7 +137,7 @@ class Session {
             }
             return false;
         }
-        throw Error("Unknown connection");
+        throw new Error("Unknown connection");
     }
     
     serialize() {
@@ -303,7 +307,7 @@ class SessionManager {
     
     async state(parameters, session) {
         if (session === null) {
-            throw Error("No session");
+            throw new Error("No session");
         }
         let user = session.getUser();
         return {
@@ -314,45 +318,41 @@ class SessionManager {
     
     async listPermissionsForCurrentSession(parameters, session) {
         if (session === null) {
-            throw Error("No session");
+            throw new Error("No session");
         }
         return session.getPermissions();
     }
     
     async getSubscriptions(parameters, session, connection) {
         if (session === null) {
-            throw Error("No session");
+            throw new Error("No session");
         }
         if (connection === null) {
-            throw Error("No persistent connection");
+            throw new Error("No persistent connection");
         }
         if (typeof connection.smIdentifier !== "string") {
-            throw Error("Connection doesn't have an identifier");
+            throw new Error("Connection doesn't have an identifier");
         }
         return session.getSubscriptions(connection.smIdentifier);
     }
     
     async subscribe(parameters, session, connection) {
         if (session === null) {
-            throw Error("No session");
+            throw new Error("No session");
         }
         if (connection === null) {
-            throw Error("No persistent connection");
+            throw new Error("No persistent connection");
         }
         if (typeof connection.smIdentifier !== "string") {
-            throw Error("Connection doesn't have an identifier");
+            throw new Error("Connection doesn't have an identifier");
         }
         if (typeof parameters === "string") {
-            if (session.checkPermission(parameters, true)) {
-                return session.subscribe(parameters, connection.smIdentifier);
-            } else {
-                throw Error("Permission denied");
-            }
+            return session.subscribe(parameters, connection.smIdentifier);
         } else {
             let result = [];
             for (let i = 0; i < parameters.length; i++) {
                 if (!session.checkPermission(parameters[i], true)) {
-                    throw Error("Permission denied");
+                    throw new Error("Access denied");
                 }
             }
             for (let i = 0; i < parameters.length; i++) {
@@ -364,13 +364,13 @@ class SessionManager {
 
     async unsubscribe(parameters, session, connection) {
         if (session === null) {
-            throw Error("No session");
+            throw new Error("No session");
         }
         if (connection === null) {
-            throw Error("No persistent connection");
+            throw new Error("No persistent connection");
         }
         if (typeof connection.smIdentifier !== "string") {
-            throw Error("Connection doesn't have an identifier");
+            throw new Error("Connection doesn't have an identifier");
         }
         if (typeof parameters === "string") {
             let result = await session.unsubscribe(parameters, connection.smIdentifier);

@@ -1,7 +1,8 @@
 /**
  * RPC library
  *
- * Copyright 2021 Renze Nicolai
+ * @license
+ * Copyright 2022 Renze Nicolai
  * This code is released under the MIT license.
  * SPDX-License-Identifier: MIT
  */
@@ -193,6 +194,9 @@ class Rpc {
             } else if (typeof error === "object") {
                 if (error instanceof Error) {
                     response.error = Object.assign(this._errors.returnError, {message: error.message});
+                    if (error.message === "Access denied") {
+                        response.error = this._errors.permission;
+                    }
                 } else {
                     response.error = Object.assign(this._errors.returnCustom, error);
                 }
