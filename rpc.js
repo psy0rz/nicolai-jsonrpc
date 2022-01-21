@@ -11,6 +11,13 @@
 
 const checkParameters = require("./checkParameters.js");
 
+let Ajv;
+try {
+    Ajv = require("ajv");
+} catch (error) {
+    Ajv = null;
+}
+
 class Rpc {
     constructor(aIdentity = "", aSessionManager = null, aEnablePing = true, aEnableUsage = true, aVerbose = true) {
         this._identity = aIdentity;
@@ -18,6 +25,12 @@ class Rpc {
         this._methods = {};
         this._enableUsage = aEnableUsage;
         this._verbose = aVerbose;
+
+        if (Ajv !== null) {
+            this._ajv = new Ajv();
+        } else {
+            this._ajv = null;
+        }
         
         this._errors = {
             parse:          { code: -32700, message: "Parse error"           }, // As defined in JSON-RPC 2.0
@@ -67,48 +80,77 @@ class Rpc {
         var methods = {};
         for (var i in this._methods) {
             var parameters = null;
-            if (typeof this._methods[i].parameters !== "undefined") {
-                parameters = this._methods[i].parameters;
+            if (typeof this._methods[i].parameterSchema !== "undefined") {
+                parameters = this._methods[i].parameterSchema;
             }
-            methods[i] = {parameters: parameters, result: this._methods[i].result, public: this._methods[i].public};
+            methods[i] = {parameters: parameters, result: this._methods[i].resultSchema, public: this._methods[i].public};
         }
         return methods;
     }
     
-    addMethod(name, callback, parameters = null, result = null, isPublic = false) {
+    addMethod(name, callback, parameterSchema, resultSchema, isPublic = false, useAjvForSchema = false) {
+        if (useAjvForSchema && (this._ajv === null)) {
+            throw Error("Ajv schema parser required but not available");
+        }
         if (typeof name !== "string") {
             throw Error("Expected the method name to be a string");
         }
         if (typeof callback !== "function") {
             throw Error("Expected the callback for method \"" + name + "\" to be a function");
         }
-        if (parameters !== null) {
-            if (typeof parameters !== "object") {
-                throw Error("Expected the parameter specification for method \"" + name + "\" to be either an object or an array of objects");
+
+        let ajvValidateParameters = null;
+        let ajvValidateResult = null;
+
+        if (useAjvForSchema) {
+            // JSON schema parser using Ajv
+            try {
+                ajvValidateParameters = this._ajv.compile(parameterSchema);
+            } catch (error) {
+                console.error("Failed to compile parameter schema for method '" + name + "'");
+                throw error;
             }
-            if (!Array.isArray(parameters)) {
-                parameters = [parameters]; // Encapsulate parameter specifications in an array to allow for supplying multiple specifications
+            try {
+                ajvValidateResult = this._ajv.compile(resultSchema);
+            } catch (error) {
+                console.error("Failed to compile result schema for method '" + name + "'");
+                throw error;
             }
-            for (let index = 0; index < parameters.length; index++) {
-                if (typeof parameters[index].type !== "string") {
-                    throw Error("Expected each parameter specification for method \"" + name + "\" to contain a type declaration");
+        } else {
+            // Legacy custom schema language
+            if (typeof parameterSchema !== "object") {
+                throw Error("Expected the parameter schema for method \"" + name + "\" to be either an object or an array of objects");
+            }
+            if (!Array.isArray(parameterSchema)) {
+                parameterSchema = [parameterSchema]; // Encapsulate parameter schema in an array to allow for supplying multiple specifications
+            }
+            for (let index = 0; index < parameterSchema.length; index++) {
+                if (typeof parameterSchema[index].type !== "string") {
+                    throw Error("Expected each parameter schema for method \"" + name + "\" to contain a type declaration");
+                }
+            }
+
+            if (typeof resultSchema !== "object") {
+                throw Error("Expected the result schema for method \"" + name + "\" to be either an object or an array of objects");
+            }
+            if (!Array.isArray(resultSchema)) {
+                resultSchema = [resultSchema]; // Encapsulate result schema in an array to allow for supplying multiple specifications
+            }
+            for (let index = 0; index < resultSchema.length; index++) {
+                if (typeof resultSchema[index].type !== "string") {
+                    throw Error("Expected each result schema for \"" + name + "\" to contain a type declaration");
                 }
             }
         }
-        if (result !== null) {
-            if (typeof result !== "object") {
-                throw Error("Expected the parameter specification for method \"" + name + "\" to be either an object or an array of objects");
-            }
-            if (!Array.isArray(result)) {
-                result = [result]; // Encapsulate result specifications in an array to allow for supplying multiple specifications
-            }
-            for (let index = 0; index < result.length; index++) {
-                if (typeof result[index].type !== "string") {
-                    throw Error("Expected each result specification for \"" + name + "\" to contain a type declaration");
-                }
-            }
-        }
-        this._methods[name] = {callback: callback, parameters: parameters, result: result, public: isPublic};
+
+        this._methods[name] = {
+            callback: callback,
+            parameterSchema: parameterSchema,
+            resultSchema: resultSchema,
+            public: isPublic,
+            ajvValidateParameters: ajvValidateParameters,
+            ajvValidateResult: ajvValidateResult
+        };
     }
     
     deleteMethod(name) {
@@ -150,20 +192,29 @@ class Rpc {
         }
         
         // 3) Check if the client has provided valid parameters
-        if ((typeof this._methods[method].parameters !== "undefined") && (this._methods[method].parameters !== null)) {
-            let accepted = false;
-            let reason = "";
-            for (var i = 0; i < this._methods[method].parameters.length; i++) {
-                let constraints = this._methods[method].parameters[i];
-                const [result, subReason] = checkParameters(parameters, constraints);
-                reason = subReason;
-                if (result) {
-                    accepted = true;
-                    break;
+        if ((typeof this._methods[method].parameterSchema !== "undefined") && (this._methods[method].parameterSchema !== null)) {
+            let ajvValidate = this._methods[method].ajvValidateParameters;
+            if (ajvValidate !== null) {
+                let valid = ajvValidate(parameters);
+                if (!valid) {
+                    throw Object.assign(this._errors.parameters, {"reason": ajvValidate.errors});
                 }
-            }
-            if (!accepted) {
-                throw Object.assign(this._errors.parameters, {"reason": reason});
+            } else {
+                // Legacy validator
+                let valid = false;
+                let reason = "";
+                for (var i = 0; i < this._methods[method].parameterSchema.length; i++) {
+                    let constraints = this._methods[method].parameterSchema[i];
+                    const [result, subReason] = checkParameters(parameters, constraints);
+                    reason = subReason;
+                    if (result) {
+                        valid = true;
+                        break;
+                    }
+                }
+                if (!valid) {
+                    throw Object.assign(this._errors.parameters, {"reason": reason});
+                }
             }
         }
         
