@@ -76,21 +76,29 @@ class Rpc {
         }
     }
     
-    listMethods() {
-        var methods = {};
-        for (var i in this._methods) {
-            var parameters = null;
-            if (typeof this._methods[i].parameterSchema !== "undefined") {
-                parameters = this._methods[i].parameterSchema;
+    listMethods(onlyPublic = false, returnArray = false) {
+        let methods = returnArray ? [] : {};
+        for (let methodName in this._methods) {
+            let parameters = null;
+            if (typeof this._methods[methodName].parameterSchema !== "undefined") {
+                parameters = this._methods[methodName].parameterSchema;
             }
-            methods[i] = {parameters: parameters, result: this._methods[i].resultSchema, public: this._methods[i].public};
+            if (this._methods[methodName].public || (!onlyPublic)) {
+                if (returnArray) {
+                    methods.push(methodName);
+                } else {
+                    methods[methodName] = {parameters: parameters, result: this._methods[methodName].resultSchema, public: this._methods[methodName].public};
+                }
+            }
         }
         return methods;
     }
     
     addMethod(name, callback, parameterSchema, resultSchema, isPublic = false, useAjvForSchema = false) {
         if (useAjvForSchema && (this._ajv === null)) {
-            throw Error("Ajv schema parser required but not available");
+            //throw Error("Ajv schema parser required but not available");
+            console.log("Warning: method '" + name + "' requests Ajv schema parser, but Ajv is not available");
+            useAjvForSchema = false;
         }
         if (typeof name !== "string") {
             throw Error("Expected the method name to be a string");
@@ -137,6 +145,10 @@ class Rpc {
                 resultSchema = [resultSchema]; // Encapsulate result schema in an array to allow for supplying multiple specifications
             }
             for (let index = 0; index < resultSchema.length; index++) {
+                if (resultSchema[index] === null) {
+                    console.log("Warning: method '" + name + "' defines no result schema");
+                    continue;
+                }
                 if (typeof resultSchema[index].type !== "string") {
                     throw Error("Expected each result schema for \"" + name + "\" to contain a type declaration");
                 }
@@ -151,12 +163,38 @@ class Rpc {
             ajvValidateParameters: ajvValidateParameters,
             ajvValidateResult: ajvValidateResult
         };
+
+        if (this._sessionManager !== null) {
+            this._sessionManager.setPublicMethods(this.listMethods(true, true));
+        }
+    }
+
+    addPushStub(name, isPublic = false, description = "This method can only be used as a push message topic") {
+        let result = this.addMethod(
+            name,
+            async (parameters, session) => {
+                throw Error("Please subscribe to this method via the push message API, no RPC functionality is implemented for this method.");
+            },
+            {type: "null", description: description},
+            {type: "null"},
+            isPublic,
+            false
+        );
+
+        if (this._sessionManager !== null) {
+            this._sessionManager.setPublicMethods(this.listMethods(true, true));
+        }
+
+        return result;
     }
     
     deleteMethod(name) {
         if (this._methods[name]) {
             delete this._methods[name];
             return true;
+        }
+        if (this._sessionManager !== null) {
+            this._sessionManager.setPublicMethods(this.listMethods(true, true));
         }
         return false;
     }

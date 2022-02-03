@@ -1,6 +1,6 @@
 {
   "name": "nicolai-jsonrpc",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "description": "A simple JSON RPC 2.0 library",
   "main": "index.js",
   "scripts": {

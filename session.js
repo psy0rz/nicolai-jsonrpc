@@ -215,9 +215,10 @@ class SessionManager {
         if (this._opts.timeout !== null) {
             setTimeout(this._gc.bind(this), 5000);
         }
-        
-        this._permissionsToAddToNewSessions = [];
+
         this._rpcMethodPrefix = "";
+
+        this._publicMethods = [];
     }
     
     /* Internal functions */
@@ -274,21 +275,15 @@ class SessionManager {
         return this.sessions;
     }
 
-    addPermissionToNewSessions(permission) {
-        if (!this._permissionsToAddToNewSessions.includes(permission)) {
-            this._permissionsToAddToNewSessions.push(permission);
-        }
-    }
-
-    removePermissionFromNewSessions(permission) {
-         this._permissionsToAddToNewSessions.filter((value) => {return value !== permission})
+    setPublicMethods(methods) {
+        this._publicMethods = methods;
     }
     
     /* RPC API functions: management of individual sessions */
 
     // eslint-disable-next-line no-unused-vars
     async createSession(parameters, session) {
-        let newSession = new Session(JSON.parse(JSON.stringify(this._permissionsToAddToNewSessions)), this._rpcMethodPrefix); // The JSON operations here copy the permissions array
+        let newSession = new Session(this._publicMethods, this._rpcMethodPrefix); // The JSON operations here copy the permissions array
         this.sessions.push(newSession);
         return newSession.getIdentifier();
     }
@@ -404,13 +399,6 @@ class SessionManager {
         if (prefix!=="") prefix = prefix + "/";
 
         this._rpcMethodPrefix = prefix;
-        this._permissionsToAddToNewSessions.push(prefix + "create");
-        this._permissionsToAddToNewSessions.push(prefix + "destroy");
-        this._permissionsToAddToNewSessions.push(prefix + "state");
-        this._permissionsToAddToNewSessions.push(prefix + "permissions");
-        this._permissionsToAddToNewSessions.push(prefix + "push/subscriptions");
-        this._permissionsToAddToNewSessions.push(prefix + "push/subscribe");
-        this._permissionsToAddToNewSessions.push(prefix + "push/unsubscribe");
         
         /*
         * Create session
@@ -451,7 +439,7 @@ class SessionManager {
                 type: "boolean",
                 description: "True when the session has succesfully been destroyed, false when the session could not be destroyed"
             },
-            false
+            true
         );
         
         /*
@@ -486,7 +474,7 @@ class SessionManager {
                     }
                 }
             },
-            false
+            true
         );
         
         /*
@@ -511,7 +499,7 @@ class SessionManager {
                     description: "Method which this session may call"
                 }
             },
-            false
+            true
         );
         
         /* 
@@ -533,7 +521,7 @@ class SessionManager {
                     type: "string", description: "Topic"
                 }
             },
-            false
+            true
         );
         
         /* 
@@ -569,7 +557,7 @@ class SessionManager {
                     }
                 }
             ],
-            false
+            true
         );
         
         /*
@@ -605,7 +593,7 @@ class SessionManager {
                     }
                 }
             ],
-            false
+            true
         );
         
         /*
