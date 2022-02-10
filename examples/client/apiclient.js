@@ -61,16 +61,16 @@ class ApiClient {
     }
 
     _handleWsError(event) {
-        this._handleError("websocket", event);
+        this._handleError("Connection error", true, event);
     }
 
-    _handleError(source, ...args) {
+    _handleError(source, restart, ...args) {
         if (typeof this.onError === "function") {
             this.onError(source, ...args);
         } else {
             console.log("API error ("+source+")", ...args);
         }
-        if (this.socket !== null) {
+        if ((this.socket !== null) && restart) {
             this.socket.close();
         }
     }
@@ -217,16 +217,25 @@ class ApiClient {
                         console.error("Response ignored, no callback available", message);
                     }
                 } else {
-                    this._handleError("no identifier in response", message);
+                    this._handleError("no identifier in response", false, message);
                 }
             }
         } catch(err) {
-            this._handleError("exception while handling event response", err);
+            try {
+                var message = JSON.parse(event.data);
+                if (typeof this._wsCallbacks[message.id]==="function") {
+                    clearTimeout(this._wsTimeouts[message.id]);
+                    delete this._wsCallbacks[message.id];
+                    delete this._wsTimeouts[message.id];
+                }
+            } catch (_) {}
+            this._handleError("exception while handling event response", false, err);
         }
     }
 
     pushSubscribe(subject, callback, requestCallback = null) {
         if (requestCallback === null) {
+            // eslint-disable-next-line no-unused-vars
             requestCallback = (result, error) => {};
         }
         this.request("session/push/subscribe", subject, requestCallback);
@@ -240,7 +249,7 @@ class ApiClient {
 
     pushUnsubscribe(subject, callback, requestCallback = null) {
         if (requestCallback === null) {
-            // Dummy callback function
+            // eslint-disable-next-line no-unused-vars
             requestCallback = (result, error) => {};
         }
         if (!(subject in this._wsPushCallbacks)) {
@@ -312,5 +321,36 @@ class ApiClient {
             }
         }
         return result;
+    }
+
+    _mergeArrays(...arrays) {
+        let jointArray = [];
+    
+        arrays.forEach(array => {
+            jointArray = [...jointArray, ...array];
+        });
+        const uniqueArray = jointArray.reduce((newArray, item) => {
+            if (newArray.includes(item)) {
+                return newArray;
+            } else {
+                return [...newArray, item];
+            }
+        }, []);
+        return uniqueArray;
+    }
+
+    getPermissions() {
+        let permissions = [];
+        if (this.session) {
+            permissions = permissions.concat(this.session.permissions);
+            if (this.session.user) {
+                permissions = this._mergeArrays(permissions, this.session.user.permissions);
+                for (let groupIndex = 0; groupIndex < this.session.user.groups.length; groupIndex++) {
+                    let group = this.session.user.groups[groupIndex];
+                    permissions = this._mergeArrays(permissions, group.permissions);
+                }
+            }
+        }
+        return permissions;
     }
 }
