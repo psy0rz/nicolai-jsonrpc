@@ -235,7 +235,11 @@ class Rpc {
             if (ajvValidate !== null) {
                 let valid = ajvValidate(parameters);
                 if (!valid) {
-                    throw Object.assign(this._errors.parameters, {"reason": ajvValidate.errors});
+                    throw {
+                        code: this._errors.parameters.code,
+                        message: this._errors.parameters.message,
+                        reason: ajvValidate.errors
+                    };
                 }
             } else {
                 // Legacy validator
@@ -251,7 +255,11 @@ class Rpc {
                     }
                 }
                 if (!valid) {
-                    throw Object.assign(this._errors.parameters, {"reason": reason});
+                    throw {
+                        code: this._errors.parameters.code,
+                        message: this._errors.parameters.message,
+                        reason: reason
+                    };
                 }
             }
         }
@@ -280,15 +288,22 @@ class Rpc {
             response.result = await this._execute(request.method, request.params, request.token, connection);
         } catch (error) {
             if (typeof error === "string") {
-                response.error = Object.assign(this._errors.returnString, {message: error});
+                response.error = {
+                    code: this._errors.returnString.code,
+                    message: error
+                };
             } else if (typeof error === "object") {
                 if (error instanceof Error) {
-                    response.error = Object.assign(this._errors.returnError, {message: error.message});
                     if (error.message === "Access denied") {
                         response.error = this._errors.permission;
+                    } else {
+                        response.error = {
+                            code: this._errors.returnError.code,
+                            message: error.message
+                        };
                     }
                 } else {
-                    response.error = Object.assign(this._errors.returnCustom, error);
+                    response.error = error;
                 }
             } else {
                 response.error = this._errors.internal;
