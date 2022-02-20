@@ -1,7 +1,5 @@
 /**
- * @license
- * Copyright 2021 Renze Nicolai
- * This code is released under the MIT license.
+ * Copyright 2022 Renze Nicolai
  * SPDX-License-Identifier: MIT
  */
 
