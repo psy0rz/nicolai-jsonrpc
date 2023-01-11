@@ -11,7 +11,8 @@
     "url": "git+https://github.com/renzenicolai/nicolai-jsonrpc.git"
   },
   "keywords": [
-    "RPC", "jsonrpc"
+    "RPC",
+    "jsonrpc"
   ],
   "author": "Renze Nicolai",
   "license": "MIT",
@@ -21,6 +22,6 @@
   "homepage": "https://github.com/renzenicolai/nicolai-jsonrpc#readme",
   "dependencies": {
     "ajv": "^8.12.0",
-    "ws": "^8.4.0"
+    "ws": "^8.12.0"
   }
 }
