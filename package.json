@@ -1,6 +1,6 @@
 {
   "name": "nicolai-jsonrpc",
-  "version": "1.3.6",
+  "version": "2.0.0",
   "description": "A simple JSON RPC 2.0 library",
   "main": "index.js",
   "scripts": {
@@ -8,18 +8,20 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/renzenicolai/simple-json-rpc.git"
+    "url": "git+https://github.com/renzenicolai/nicolai-jsonrpc.git"
   },
   "keywords": [
-    "RPC"
+    "RPC",
+    "jsonrpc"
   ],
   "author": "Renze Nicolai",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/renzenicolai/simple-json-rpc/issues"
+    "url": "https://github.com/renzenicolai/nicolai-jsonrpc/issues"
   },
-  "homepage": "https://github.com/renzenicolai/simple-json-rpc#readme",
+  "homepage": "https://github.com/renzenicolai/nicolai-jsonrpc#readme",
   "dependencies": {
-    "ws": "^8.4.0"
+    "ajv": "^8.12.0",
+    "ws": "^8.12.0"
   }
 }

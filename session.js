@@ -1,9 +1,5 @@
 /**
- * Session management
- *
- * @license
  * Copyright 2022 Renze Nicolai
- * This code is released under the MIT license.
  * SPDX-License-Identifier: MIT
  */
 
@@ -406,19 +402,16 @@ class SessionManager {
         * Returns a unique session token used to identify the session in further requests
         * 
         */
-        rpc.addMethod(
+        rpc.addPublicMethod(
             prefix+"create",
             this.createSession.bind(this),
-            [
-                {
-                    type: "none"
-                }
-            ],
+            {
+                type: "null"
+            },
             {
                 type: "string",
                 description: "Session token"
-            },
-            true
+            }
         );
         
         /*
@@ -427,19 +420,16 @@ class SessionManager {
         * Destroys the session attached to the request
         * 
         */
-        rpc.addMethod(
+        rpc.addPublicMethod(
             prefix+"destroy",
             this.destroyCurrentSession.bind(this),
-            [
-                {
-                    type: "none"
-                }
-            ],
+            {
+                type: "null"
+            },
             {
                 type: "boolean",
                 description: "True when the session has succesfully been destroyed, false when the session could not be destroyed"
-            },
-            true
+            }
         );
         
         /*
@@ -448,18 +438,16 @@ class SessionManager {
         * Returns the state of the session attached to the request
         * 
         */
-        rpc.addMethod(
+        rpc.addPublicMethod(
             prefix+"state",
             this.state.bind(this),
-            [
-                {
-                    type: "none"
-                }
-            ],
+            {
+                type: "null"
+            },
             {
                 type: "object",
                 description: "State of the session",
-                contains: {
+                properties: {
                     user: {
                         type: "object",
                         description: "Serialized user or NULL when no user is available"
@@ -467,14 +455,13 @@ class SessionManager {
                     permissions: {
                         type: "array",
                         description: "List of methods which this session may call",
-                        contains: {
+                        items: {
                             type: "string",
                             description: "Method which this session may call"
                         }
                     }
                 }
-            },
-            true
+            }
         );
         
         /*
@@ -483,23 +470,20 @@ class SessionManager {
         * Returns a list of permissions granted to the session attached to the request
         * 
         */
-        rpc.addMethod(
+        rpc.addPublicMethod(
             prefix+"permissions",
             this.listPermissionsForCurrentSession.bind(this),
-            [
-                {
-                    type: "none"
-                }
-            ],
+            {
+                type: "null"
+            },
             {
                 type: "array",
                 description: "List of methods which this session may call",
-                contains: {
+                items: {
                     type: "string",
                     description: "Method which this session may call"
                 }
-            },
-            true
+            }
         );
         
         /* 
@@ -508,20 +492,20 @@ class SessionManager {
         * Returns the list of topics subscribed to the connection of the session attached to the request
         * 
         */
-        rpc.addMethod(
+        rpc.addPublicMethod(
             prefix+"push/subscriptions",
             this.getSubscriptions.bind(this),
             {
-                type: "none"
+                type: "null"
             },
             {
                 type: "array",
                 description: "Array of topics which the session is subscribed to",
-                contains: {
-                    type: "string", description: "Topic"
+                items: {
+                    type: "string",
+                    description: "Topic"
                 }
-            },
-            true
+            }
         );
         
         /* 
@@ -530,34 +514,40 @@ class SessionManager {
         * Adds the supplied topic to the list of topics subscribed to the connection of the session attached to the request
         * 
         */
-        rpc.addMethod(
+        rpc.addPublicMethod(
             prefix+"push/subscribe",
             this.subscribe.bind(this),
-            [
-                {
-                    type: "string",
-                    description: "Topic"
-                },
-                {
-                    type: "array",
-                    contains: "string",
-                    description: "Array containing topics"
-                }
-            ],
-            [
-                {
-                    type: "boolean",
-                    description: "True when successfully subscribed, false when already subscribed"
-                },
-                {
-                    type: "array",
-                    description: "Array of results",
-                    contains: {
-                        type: "boolean", description: "True when successfully subscribed, false when already subscribed"
+            {
+                anyOf: [
+                    {
+                        type: "string",
+                        description: "Topic"
+                    },
+                    {
+                        type: "array",
+                        items: {
+                            type: "string"
+                        },
+                        description: "Array containing topics"
                     }
-                }
-            ],
-            true
+                ]
+            },
+            {
+                anyOf: [
+                    {
+                        type: "boolean",
+                        description: "True when successfully subscribed, false when already subscribed"
+                    },
+                    {
+                        type: "array",
+                        description: "Array of results",
+                        items: {
+                            type: "boolean",
+                            description: "True when successfully subscribed, false when already subscribed"
+                        }
+                    }
+                ]
+            }
         );
         
         /*
@@ -566,34 +556,39 @@ class SessionManager {
         * Removes the supplied topic to the list of topics subscribed to the connection of the session attached to the request
         * 
         */
-        rpc.addMethod(
+        rpc.addPublicMethod(
             prefix+"push/unsubscribe",
             this.unsubscribe.bind(this),
-            [
-                {
-                    type: "string",
-                    description: "Topic"
-                },
-                {
-                    type: "array",
-                    contains: "string",
-                    description: "Array containing topics"
-                }
-            ],
-            [
-                {
-                    type: "boolean",
-                    description: "True when successfully unsubscribed, false when already unsubscribed"
-                },
-                {
-                    type: "array",
-                    description: "Array of results",
-                    contains: {
-                        type: "boolean", description: "True when successfully unsubscribed, false when already unsubscribed"
+            {
+                anyOf: [
+                    {
+                        type: "string",
+                        description: "Topic"
+                    },
+                    {
+                        type: "array",
+                        items: {
+                            type: "string",
+                        },
+                        description: "Array containing topics"
                     }
-                }
-            ],
-            true
+                ]
+            },
+            {
+                anyOf: [
+                    {
+                        type: "boolean",
+                        description: "True when successfully unsubscribed, false when already unsubscribed"
+                    },
+                    {
+                        type: "array",
+                        description: "Array of results",
+                        items: {
+                            type: "boolean", description: "True when successfully unsubscribed, false when already unsubscribed"
+                        }
+                    }
+                ]
+            }
         );
         
         /*
@@ -605,13 +600,39 @@ class SessionManager {
         rpc.addMethod(
             prefix+"management/list",
             this.listSessions.bind(this),
-            [
-                {
-                    type: "none"
+            {
+                type: "null"
+            },
+            {
+                type: "array",
+                description: "List of serialized sessions",
+                items: {
+                    type: "object",
+                    properties: {
+                        id: {
+                            type: "string"
+                        },
+                        user: {
+
+                        },
+                        dateCreated: {
+                            type: "number"
+                        },
+                        dateLastUsed: {
+                            type: "number"
+                        },
+                        subscriptions: {
+                            type: "string"
+                        },
+                        permissions: {
+                            type: "array",
+                            items: {
+                                type: "string"
+                            }
+                        },
+                    }
                 }
-            ],
-            {type: "array", description: "List of serialized sessions"},
-            false
+            }
         );
         
         /*
@@ -623,14 +644,14 @@ class SessionManager {
         rpc.addMethod(
             prefix+"management/destroy",
             this.destroySession.bind(this),
-            [
-                {
-                    type: "string",
-                    description: "Unique identifier of the session that will be destroyed"
-                }
-            ],
-            {type: "boolean", description: "True when a session was destroyed, false when no session with the supplied identifier exists"},
-            false
+            {
+                type: "string",
+                description: "Unique identifier of the session that will be destroyed"
+            },
+            {
+                type: "boolean",
+                description: "True when a session was destroyed, false when no session with the supplied identifier exists"
+            }
         );
     }
 }
