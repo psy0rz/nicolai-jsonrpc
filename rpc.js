@@ -1,5 +1,5 @@
 /**
- * Copyright 2022 Renze Nicolai
+ * Copyright 2023 Renze Nicolai
  * SPDX-License-Identifier: MIT
  */
 
@@ -8,11 +8,12 @@
 const Ajv = require("ajv/dist/2019");
 
 class Rpc {
-    constructor(aIdentity = "", aSessionManager = null, aVerbose = true) {
+    constructor(aIdentity = "", aSessionManager = null, aVerbose = true, openapiVersion = "3.0.0") {
         this._identity = aIdentity;
         this._sessionManager = aSessionManager;
         this._methods = {};
         this._verbose = aVerbose;
+        this._openapiVersion = openapiVersion;
 
         if (typeof this._identity === "string") {
             // Legacy compatibility
@@ -24,11 +25,11 @@ class Rpc {
             throw new Error("Expected identity to be an object");
         }
 
-        if (Ajv !== null) {
-            this._ajv = new Ajv();
-        } else {
-            this._ajv = null;
-        }
+        this._ajv = new Ajv({
+            strict: true,
+            strictSchema: true, // Prevent unknown keywords, formats etc.
+            removeAdditional: true // Remove properties not defined in the schema when additionalProperties isn't set
+        });
         
         this._errors = {
             parse:          { code: -32700, message: "Parse error"           }, // As defined in JSON-RPC 2.0
@@ -45,15 +46,19 @@ class Rpc {
 
         // A method that returns API usage information
         // eslint-disable-next-line no-unused-vars
-        this.addPublicMethod("usage", (parameters, session) => { return this.usage(); }, {type: "null"}, {type: "object", description: "Object describing this API"});
+        this.addPublicMethod("usage", (parameters, session) => { return this.usage(); }, null, {type: "object", description: "Object describing this API"});
 
         // A method that allows for executing a connection test
         // eslint-disable-next-line no-unused-vars
-        this.addPublicMethod("ping", (parameters, session) => { return "pong"; }, {type: "null"}, {type: "string", description: "A string containing the text 'pong'"});
+        this.addPublicMethod("ping", (parameters, session) => { return "pong"; }, null, {type: "string", description: "A string containing the text 'pong'"});
 
         // A method that returns the list of available methods
         // eslint-disable-next-line no-unused-vars
-        this.addPublicMethod("methods", (parameters, session) => { return this.getMethods(); }, {type: "null"}, {type: "array", description: "List of methods", items: {type: "string"}});
+        this.addPublicMethod("methods", (parameters, session) => { return this.listMethods(false, true); }, null, {type: "array", description: "List of methods", items: {type: "string"}});
+        
+        // A method that returns the list of available public methods
+        // eslint-disable-next-line no-unused-vars
+        this.addPublicMethod("methods/public", (parameters, session) => { return this.listMethods(true, true); }, null, {type: "array", description: "List of methods", items: {type: "string"}});
 
         // Add methods for managing sessions
         if (this._sessionManager) {
@@ -76,7 +81,7 @@ class Rpc {
             }
         ];
         let output = {
-            openapi: "3.0.0",
+            openapi: this._openapiVersion,
             info: this._identity,
             paths: {
                 "/": {
@@ -154,44 +159,39 @@ class Rpc {
             let methodInfo = this._methods[method];
             output.paths["/" + method] = {};
             let resultSchemaContainer = {};
-            if ((methodInfo.ajvValidateResult !== null) && (typeof methodInfo.resultSchema === "object")) {
+            if ((methodInfo.resultValidator !== null) && (typeof methodInfo.resultSchema === "object")) {
                 resultSchemaContainer = {schema: methodInfo.resultSchema};
             }
-            if ((methodInfo.ajvValidateParameters === null) || (typeof methodInfo.parameterSchema !== "object")) {
-                console.log("Warning: RPC method '" + method + "' does not have a valid parameter schema defined");
-            } else {
-                let description = {
-                    operationId: method,
-                    summary: "",
-                    responses: {
-                        "200": {
-                            description: "200 response",
-                            content: {
-                                "application/json": resultSchemaContainer
-                            }
+            let description = {
+                operationId: method,
+                summary: "",
+                responses: {
+                    "200": {
+                        description: "200 response",
+                        content: {
+                            "application/json": resultSchemaContainer
+                        }
+                    }
+                }
+            };
+            if (!methodInfo.public) {
+                description.parameters = authorizationParameter;
+            }
+            if (!methodInfo.noParameters) {
+                // Parameters: POST request
+                description.requestBody = {
+                    required: true,
+                    content: {
+                        "application/json": {
+                            schema: methodInfo.parameterSchema
                         }
                     }
                 };
-                if (!methodInfo.public) {
-                    description.parameters = authorizationParameter;
-                }
-                if (methodInfo.parameterSchema.type !== "null") {
-                    // Parameters: POST request
-                    description.requestBody = {
-                        required: true,
-                        content: {
-                            "application/json": {
-                                schema: methodInfo.parameterSchema
-                            }
-                        }
-                    };
-                    output.paths["/" + method].post = description;
-                } else {
-                    // No parameters: GET request
-                    output.paths["/" + method].get = description;
-                }
+                output.paths["/" + method].post = description;
+            } else {
+                // No parameters: GET request
+                output.paths["/" + method].get = description;
             }
-
         }
         return output;
     }
@@ -214,14 +214,6 @@ class Rpc {
         return methods;
     }
 
-    getMethods() {
-        var methods = [];
-        for (let method in this._methods) {
-            methods.push(method);
-        }
-        return methods;
-    }
-
     addPublicMethod(name, callback, parameterSchema, resultSchema) {
         return this.addMethod(name, callback, parameterSchema, resultSchema, true);
     }
@@ -234,20 +226,24 @@ class Rpc {
             throw Error("Expected the callback for method \"" + name + "\" to be a function");
         }
 
-        let ajvValidateParameters = null;
-        let ajvValidateResult = null;
+        let parameterValidator = null;
+        let resultValidator = null;
 
-        try {
-            ajvValidateParameters = this._ajv.compile(parameterSchema);
-        } catch (error) {
-            console.error("Failed to compile parameter schema for method '" + name + "'");
-            throw error;
+        if (parameterSchema !== null) {
+            try {
+                parameterValidator = this._ajv.compile(parameterSchema);
+            } catch (error) {
+                console.error("Failed to compile parameter schema for method '" + name + "'");
+                throw error;
+            }
         }
-        try {
-            ajvValidateResult = this._ajv.compile(resultSchema);
-        } catch (error) {
-            console.error("Failed to compile result schema for method '" + name + "'");
-            throw error;
+        if (resultSchema !== null) {
+            try {
+                resultValidator = this._ajv.compile(resultSchema);
+            } catch (error) {
+                console.error("Failed to compile result schema for method '" + name + "'");
+                throw error;
+            }
         }
 
         this._methods[name] = {
@@ -255,8 +251,10 @@ class Rpc {
             parameterSchema: parameterSchema,
             resultSchema: resultSchema,
             public: isPublic,
-            ajvValidateParameters: ajvValidateParameters,
-            ajvValidateResult: ajvValidateResult
+            parameterValidator: parameterValidator,
+            resultValidator: resultValidator,
+            noParameters: (parameterSchema === null),
+            noResult: (resultSchema === null)
         };
 
         if (this._sessionManager !== null) {
@@ -264,14 +262,14 @@ class Rpc {
         }
     }
 
-    addPushStub(name, isPublic = false, description = "This method can only be used as a push message topic") {
+    addPushStub(name, isPublic = false) {
         let result = this.addMethod(
             name,
             async (parameters, session) => {
                 throw Error("Please subscribe to this method via the push message API, no RPC functionality is implemented for this method.");
             },
-            {type: "null", description: description},
-            {type: "null"},
+            null,
+            null,
             isPublic,
             false
         );
@@ -325,37 +323,25 @@ class Rpc {
         }
         
         // 3) Check if the client has provided valid parameters
-        if ((typeof this._methods[method].parameterSchema !== "undefined") && (this._methods[method].parameterSchema !== null)) {
-            let ajvValidate = this._methods[method].ajvValidateParameters;
-            if (ajvValidate !== null) {
-                let valid = ajvValidate(parameters);
-                if (!valid) {
-                    throw {
-                        code: this._errors.parameters.code,
-                        message: this._errors.parameters.message,
-                        reason: ajvValidate.errors
-                    };
-                }
-            } else {
-                // Legacy validator
-                let valid = false;
-                let reason = "";
-                for (var i = 0; i < this._methods[method].parameterSchema.length; i++) {
-                    let constraints = this._methods[method].parameterSchema[i];
-                    const [result, subReason] = checkParameters(parameters, constraints);
-                    reason = subReason;
-                    if (result) {
-                        valid = true;
-                        break;
-                    }
-                }
-                if (!valid) {
-                    throw {
-                        code: this._errors.parameters.code,
-                        message: this._errors.parameters.message,
-                        reason: reason
-                    };
-                }
+        if (this._methods[method].noParameters) {
+            // Function expects no parameters
+            if (parameters !== null) {
+                throw {
+                    code: this._errors.parameters.code,
+                    message: this._errors.parameters.message,
+                    reason: "Expected no parameters"
+                };
+            }
+        } else {
+            // Function expects parameters
+            let ajvValidate = this._methods[method].parameterValidator;
+            let valid = ajvValidate(parameters);
+            if (!valid) {
+                throw {
+                    code: this._errors.parameters.code,
+                    message: this._errors.parameters.message,
+                    reason: ajvValidate.errors
+                };
             }
         }
         
@@ -462,7 +448,7 @@ class Rpc {
                 error = this._errors.internal;
             }
             if (this._verbose) {
-                console.error("HTTP request RPC call to '" + url + "' failed", error, token);
+                console.error("HTTP request RPC call to '" + url + "' failed", error);
             }
             throw JSON.stringify(error);
         }

@@ -52,7 +52,7 @@ class Webserver {
         ws.identifier = crypto.randomBytes(64).toString("base64"); // Used to keep track of connections within the session manager
         ws.isAlive = true;
         ws.on("message", this._onWsMessage.bind(this, ws));
-        ws.on('pong', this._onWsHeartbeat.bind(this, ws));
+        ws.on("pong", this._onWsHeartbeat.bind(this, ws));
     }
         
     _onWsMessage(ws, data, isBinary) {
@@ -85,7 +85,6 @@ class Webserver {
             url = url.substring(this._opts.url.length);
         }
         let token = null;
-        console.log(headers);
         if ("token" in headers) {
             token = headers.token.split(" ").pop();
         } else if ("authorization" in headers) {
@@ -96,7 +95,6 @@ class Webserver {
             body += data;
         });
         request.on("end", () => {
-            console.log("Request", method, url);
             if (url === "/") {
                 if (method === "POST") {
                     this._opts.application.handle(body, null, token).then((result) => {

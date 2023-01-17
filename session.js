@@ -138,9 +138,19 @@ class Session {
     
     serialize() {
         // Summary of the session
+        let user = null;
+        if (this._user !== null) {
+            if (typeof this._user.summarize === "function") {
+                user = this._user.summarize();
+            } else if (typeof this._user.serialize === "function") {
+                user = this._user.serialize();
+            } else {
+                user = this._user;
+            }
+        }
         return {
             id: this._id,
-            user: this._user,
+            user: user,
             dateCreated: this._dateCreated,
             dateLastUsed: this._dateLastUsed,
             subscriptions: this._subscriptions,
@@ -202,7 +212,8 @@ class Session {
 class SessionManager {
     constructor(opts={}) {
         this._opts = Object.assign({
-            timeout: null
+            timeout: null,
+            userSchema: {}
         }, opts);
 
         this.sessions = [];
@@ -215,6 +226,8 @@ class SessionManager {
         this._rpcMethodPrefix = "";
 
         this._publicMethods = [];
+
+        this.userSchema = this._opts.userSchema;
     }
     
     /* Internal functions */
@@ -275,6 +288,10 @@ class SessionManager {
         this._publicMethods = methods;
     }
     
+    setUserSchema(schema) {
+        this.userSchema = schema;
+    }
+
     /* RPC API functions: management of individual sessions */
 
     // eslint-disable-next-line no-unused-vars
@@ -405,9 +422,7 @@ class SessionManager {
         rpc.addPublicMethod(
             prefix+"create",
             this.createSession.bind(this),
-            {
-                type: "null"
-            },
+            null,
             {
                 type: "string",
                 description: "Session token"
@@ -423,9 +438,7 @@ class SessionManager {
         rpc.addPublicMethod(
             prefix+"destroy",
             this.destroyCurrentSession.bind(this),
-            {
-                type: "null"
-            },
+            null,
             {
                 type: "boolean",
                 description: "True when the session has succesfully been destroyed, false when the session could not be destroyed"
@@ -441,9 +454,7 @@ class SessionManager {
         rpc.addPublicMethod(
             prefix+"state",
             this.state.bind(this),
-            {
-                type: "null"
-            },
+            null,
             {
                 type: "object",
                 description: "State of the session",
@@ -473,9 +484,7 @@ class SessionManager {
         rpc.addPublicMethod(
             prefix+"permissions",
             this.listPermissionsForCurrentSession.bind(this),
-            {
-                type: "null"
-            },
+            null,
             {
                 type: "array",
                 description: "List of methods which this session may call",
@@ -495,9 +504,7 @@ class SessionManager {
         rpc.addPublicMethod(
             prefix+"push/subscriptions",
             this.getSubscriptions.bind(this),
-            {
-                type: "null"
-            },
+            null,
             {
                 type: "array",
                 description: "Array of topics which the session is subscribed to",
@@ -600,9 +607,7 @@ class SessionManager {
         rpc.addMethod(
             prefix+"management/list",
             this.listSessions.bind(this),
-            {
-                type: "null"
-            },
+            null,
             {
                 type: "array",
                 description: "List of serialized sessions",
