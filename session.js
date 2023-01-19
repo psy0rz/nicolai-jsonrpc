@@ -59,6 +59,9 @@ class Session {
     
     getUser() {
         // Get the associated user account
+        if (this._user === null) return null;
+        if (typeof this._user.summarize === "function") return this._user.summarize();
+        if (typeof this._user.serialize === "function") return this._user.serialize();
         return this._user;
     }
     
@@ -137,22 +140,20 @@ class Session {
     }
     
     serialize() {
-        // Summary of the session
-        let user = null;
-        if (this._user !== null) {
-            if (typeof this._user.summarize === "function") {
-                user = this._user.summarize();
-            } else if (typeof this._user.serialize === "function") {
-                user = this._user.serialize();
-            } else {
-                user = this._user;
-            }
-        }
         return {
             id: this._id,
-            user: user,
+            user: this.getUser(),
             dateCreated: this._dateCreated,
             dateLastUsed: this._dateLastUsed,
+            subscriptions: this._subscriptions,
+            permissions: this._permissions
+        };
+    }
+    
+    summarize() {
+        return {
+            user: this.getUser(),
+            dateCreated: this._dateCreated,
             subscriptions: this._subscriptions,
             permissions: this._permissions
         };
@@ -317,11 +318,7 @@ class SessionManager {
         if (session === null) {
             throw new Error("No session");
         }
-        let user = session.getUser();
-        return {
-            user: (user !== null) ? ((typeof user.summarize === "function") ? user.summarize() : user.serialize()) : null,
-            permissions: session.getPermissions()
-        };
+        return session.summarize();
     }
     
     async listPermissionsForCurrentSession(parameters, session) {
@@ -452,13 +449,24 @@ class SessionManager {
         * 
         */
         rpc.addPublicMethod(
-            prefix+"state",
+            prefix + "state",
             this.state.bind(this),
             null,
             {
                 type: "object",
                 description: "State of the session",
                 properties: {
+                    dateCreated: {
+                        type: "number",
+                        description: "Timestamp of the creation of this session"
+                    },
+                    subscriptions: {
+                        type: "array",
+                        items: {
+                            type: "string"
+                        },
+                        description: "Push message topics to which this session is subscribed"
+                    },
                     user: {
                         type: "object",
                         description: "Serialized user or NULL when no user is available"
@@ -471,7 +479,8 @@ class SessionManager {
                             description: "Method which this session may call"
                         }
                     }
-                }
+                },
+                required: ["dateCreated", "subscriptions", "user", "permissions"]
             }
         );
         
@@ -482,7 +491,7 @@ class SessionManager {
         * 
         */
         rpc.addPublicMethod(
-            prefix+"permissions",
+            prefix + "permissions",
             this.listPermissionsForCurrentSession.bind(this),
             null,
             {
@@ -502,7 +511,7 @@ class SessionManager {
         * 
         */
         rpc.addPublicMethod(
-            prefix+"push/subscriptions",
+            prefix + "push/subscriptions",
             this.getSubscriptions.bind(this),
             null,
             {
@@ -522,7 +531,7 @@ class SessionManager {
         * 
         */
         rpc.addPublicMethod(
-            prefix+"push/subscribe",
+            prefix + "push/subscribe",
             this.subscribe.bind(this),
             {
                 anyOf: [
@@ -564,7 +573,7 @@ class SessionManager {
         * 
         */
         rpc.addPublicMethod(
-            prefix+"push/unsubscribe",
+            prefix + "push/unsubscribe",
             this.unsubscribe.bind(this),
             {
                 anyOf: [
@@ -605,7 +614,7 @@ class SessionManager {
         * 
         */
         rpc.addMethod(
-            prefix+"management/list",
+            prefix + "management/list",
             this.listSessions.bind(this),
             null,
             {
@@ -647,7 +656,7 @@ class SessionManager {
         * 
         */
         rpc.addMethod(
-            prefix+"management/destroy",
+            prefix + "management/destroy",
             this.destroySession.bind(this),
             {
                 type: "string",

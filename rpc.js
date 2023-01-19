@@ -28,7 +28,8 @@ class Rpc {
         this._ajv = new Ajv({
             strict: true,
             strictSchema: true, // Prevent unknown keywords, formats etc.
-            removeAdditional: true // Remove properties not defined in the schema when additionalProperties isn't set
+            removeAdditional: true, // Remove properties not defined in the schema when additionalProperties isn't set,
+            allowUnionTypes: true // Allow specifying multiple types at once
         });
         
         this._errors = {
@@ -214,10 +215,6 @@ class Rpc {
         return methods;
     }
 
-    addPublicMethod(name, callback, parameterSchema, resultSchema) {
-        return this.addMethod(name, callback, parameterSchema, resultSchema, true);
-    }
-    
     addMethod(name, callback, parameterSchema, resultSchema, isPublic = false) {
         if (typeof name !== "string") {
             throw Error("Expected the method name to be a string");
@@ -262,23 +259,33 @@ class Rpc {
         }
     }
 
+    addPublicMethod(name, callback, parameterSchema, resultSchema) {
+        return this.addMethod(name, callback, parameterSchema, resultSchema, true);
+    }
+
+    addPushMethod(name, resultSchema, isPublic = false) {
+        return this.addMethod(
+            name,
+            async (parameters, session) => {
+                throw Error("Please subscribe to this method via the push message API, no RPC functionality is implemented for this method.");
+            },
+            null,
+            resultSchema,
+            isPublic
+        );
+    }
+
     addPushStub(name, isPublic = false) {
-        let result = this.addMethod(
+        console.log("Deprecation warning: please use addPushMethod(name, resultSchema, isPublic); instead and provide a JSON schema for the push message contents");
+        return this.addMethod(
             name,
             async (parameters, session) => {
                 throw Error("Please subscribe to this method via the push message API, no RPC functionality is implemented for this method.");
             },
             null,
             null,
-            isPublic,
-            false
+            isPublic
         );
-
-        if (this._sessionManager !== null) {
-            this._sessionManager.setPublicMethods(this.listMethods(true, true));
-        }
-
-        return result;
     }
     
     deleteMethod(name) {
